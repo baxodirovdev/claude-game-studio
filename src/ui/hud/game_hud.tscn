@@ -1,0 +1,159 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://ui/hud/game_hud.gd" id="1"]
+
+[node name="GameHUD" type="CanvasLayer"]
+layer = 10
+script = ExtResource("1")
+
+; --- Top Left: Health bar + stats ---
+
+[node name="TopLeft" type="Control" parent="."]
+anchors_preset = 0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 320.0
+offset_bottom = 120.0
+
+[node name="HealthBar" type="Control" parent="TopLeft"]
+layout_mode = 0
+offset_right = 200.0
+offset_bottom = 20.0
+
+[node name="Background" type="ColorRect" parent="TopLeft/HealthBar"]
+layout_mode = 0
+offset_right = 200.0
+offset_bottom = 20.0
+color = Color(0.15, 0.15, 0.15, 0.8)
+
+[node name="Ghost" type="ColorRect" parent="TopLeft/HealthBar"]
+layout_mode = 0
+offset_right = 200.0
+offset_bottom = 20.0
+color = Color(1, 1, 1, 0.3)
+
+[node name="Fill" type="ColorRect" parent="TopLeft/HealthBar"]
+layout_mode = 0
+offset_right = 200.0
+offset_bottom = 20.0
+color = Color(0.2, 0.8, 0.2, 1)
+
+[node name="HealthLabel" type="Label" parent="TopLeft"]
+layout_mode = 0
+offset_left = 210.0
+offset_top = 0.0
+offset_right = 300.0
+offset_bottom = 20.0
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 14
+
+[node name="InvulnLabel" type="Label" parent="TopLeft"]
+visible = false
+layout_mode = 0
+offset_left = 0.0
+offset_top = 22.0
+offset_right = 100.0
+offset_bottom = 40.0
+text = "SHIELD"
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
+
+[node name="StatsLabel" type="Label" parent="TopLeft"]
+layout_mode = 0
+offset_top = 44.0
+offset_right = 300.0
+offset_bottom = 64.0
+theme_override_font_sizes/font_size = 14
+
+; --- Top Center: Timer + Scores ---
+
+[node name="TopCenter" type="Control" parent="."]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -150.0
+offset_top = 10.0
+offset_right = 150.0
+offset_bottom = 80.0
+
+[node name="TimerLabel" type="Label" parent="TopCenter"]
+layout_mode = 0
+offset_right = 300.0
+offset_bottom = 40.0
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 28
+
+[node name="ScoreLabel" type="Label" parent="TopCenter"]
+layout_mode = 0
+offset_top = 38.0
+offset_right = 300.0
+offset_bottom = 60.0
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 20
+
+[node name="KillTargetLabel" type="Label" parent="TopCenter"]
+layout_mode = 0
+offset_top = 60.0
+offset_right = 300.0
+offset_bottom = 76.0
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+
+; --- Top Right: Kill Feed ---
+
+[node name="TopRight" type="Control" parent="."]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -260.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = 180.0
+
+[node name="KillFeed" type="VBoxContainer" parent="TopRight"]
+layout_mode = 0
+offset_right = 240.0
+offset_bottom = 160.0
+alignment = 0
+
+; --- Center: Countdown, Result, Respawn ---
+
+[node name="Center" type="Control" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = -100.0
+offset_right = 300.0
+offset_bottom = 100.0
+
+[node name="CountdownLabel" type="Label" parent="Center"]
+layout_mode = 0
+offset_right = 600.0
+offset_bottom = 100.0
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 72
+
+[node name="ResultLabel" type="Label" parent="Center"]
+visible = false
+layout_mode = 0
+offset_top = -20.0
+offset_right = 600.0
+offset_bottom = 80.0
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 64
+
+[node name="RespawnLabel" type="Label" parent="Center"]
+visible = false
+layout_mode = 0
+offset_top = 80.0
+offset_right = 600.0
+offset_bottom = 120.0
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 36

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="HeroConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/config/hero_config.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+move_speed = 10.0
+max_health = 100.0
+hook_speed = 30.0
+hook_return_speed = 45.0
+hook_range = 25.0
+hook_damage = 30.0
+hook_cooldown = 2.0
+hook_hitbox_radius = 1.0
+pull_duration = 0.5

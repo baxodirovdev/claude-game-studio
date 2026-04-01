@@ -1,0 +1,80 @@
+[gd_scene load_steps=16 format=3]
+
+[ext_resource type="Script" path="res://main.gd" id="1"]
+[ext_resource type="PackedScene" path="res://core/input/input_manager.tscn" id="2"]
+[ext_resource type="Script" path="res://core/arena/arena.gd" id="3"]
+[ext_resource type="Script" path="res://core/camera/game_camera.gd" id="5"]
+[ext_resource type="Script" path="res://gameplay/player/player_controller.gd" id="6"]
+[ext_resource type="Script" path="res://gameplay/hook/hook_system.gd" id="7"]
+[ext_resource type="Script" path="res://gameplay/health/health_component.gd" id="8"]
+[ext_resource type="Script" path="res://gameplay/match/match_state_manager.gd" id="9"]
+[ext_resource type="Script" path="res://gameplay/respawn/respawn_system.gd" id="10"]
+[ext_resource type="Resource" path="res://data/config/default_hero.tres" id="11"]
+[ext_resource type="Resource" path="res://data/config/default_match.tres" id="12"]
+[ext_resource type="PackedScene" path="res://ui/hud/game_hud.tscn" id="13"]
+[ext_resource type="Script" path="res://gameplay/hazards/hazard_system.gd" id="14"]
+[ext_resource type="Script" path="res://gameplay/score/score_system.gd" id="15"]
+
+[sub_resource type="CapsuleShape3D" id="1"]
+radius = 0.4
+height = 1.6
+
+[sub_resource type="CapsuleMesh" id="2"]
+radius = 0.4
+height = 1.6
+
+[sub_resource type="StandardMaterial3D" id="3"]
+albedo_color = Color(0.2, 0.6, 1, 1)
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1")
+hero_config = ExtResource("11")
+match_config = ExtResource("12")
+
+[node name="Arena" type="Node3D" parent="."]
+script = ExtResource("3")
+
+[node name="Player" type="CharacterBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.8, 0)
+script = ExtResource("6")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
+shape = SubResource("1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Player"]
+material_override = SubResource("3")
+mesh = SubResource("2")
+
+[node name="HealthComponent" type="Node" parent="Player"]
+script = ExtResource("8")
+
+[node name="HookSystem" type="Node" parent="Player"]
+script = ExtResource("7")
+
+[node name="GameCamera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 25, 20)
+projection = 1
+size = 25.0
+near = 0.1
+far = 100.0
+script = ExtResource("5")
+
+[node name="DirectionalLight" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.5, 0.866, 0, -0.866, 0.5, 0, 20, 0)
+shadow_enabled = true
+
+[node name="InputManager" parent="." instance=ExtResource("2")]
+
+[node name="MatchStateManager" type="Node" parent="."]
+script = ExtResource("9")
+
+[node name="RespawnSystem" type="Node" parent="."]
+script = ExtResource("10")
+
+[node name="HazardSystem" type="Node" parent="."]
+script = ExtResource("14")
+
+[node name="ScoreSystem" type="Node" parent="."]
+script = ExtResource("15")
+
+[node name="GameHUD" parent="." instance=ExtResource("13")]

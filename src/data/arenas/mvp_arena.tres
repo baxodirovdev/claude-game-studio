@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="ArenaData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/arena/arena_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+arena_width = 46.0
+arena_depth = 40.0
+gap_width = 6.0
+team_a_spawns = Array[Vector3]([Vector3(-15, 0.8, -6), Vector3(-15, 0.8, -3), Vector3(-15, 0.8, 0), Vector3(-15, 0.8, 3), Vector3(-15, 0.8, 6)])
+team_b_spawns = Array[Vector3]([Vector3(15, 0.8, -6), Vector3(15, 0.8, -3), Vector3(15, 0.8, 0), Vector3(15, 0.8, 3), Vector3(15, 0.8, 6)])
+spike_zones = Array[Vector3]([Vector3(-4, 0, -8), Vector3(-4, 0, 8), Vector3(4, 0, -8), Vector3(4, 0, 8)])
+spike_zone_radius = 3.0
+pit_zones = Array[Vector3]([Vector3(-10, 0, -10), Vector3(-10, 0, 10), Vector3(10, 0, -10), Vector3(10, 0, 10)])
+pit_radius = 2.0
+ground_color = Color(0.3, 0.5, 0.3, 1)
+gap_color = Color(0.15, 0.15, 0.4, 1)

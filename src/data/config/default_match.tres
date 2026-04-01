@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="MatchConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/config/match_config.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+countdown_duration = 3.0
+match_duration = 300.0
+ended_display_duration = 3.0
+kill_target = 20
+base_respawn_time = 3.0
+overtime_penalty = 2.0
+invulnerability_duration = 2.0
+spike_base_damage = 30.0
+spike_cooldown_duration = 1.0
+spike_scaling_per_minute = 0.05
