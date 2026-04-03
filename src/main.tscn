@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=18 format=3]
 
 [ext_resource type="Script" path="res://main.gd" id="1"]
 [ext_resource type="PackedScene" path="res://core/input/input_manager.tscn" id="2"]
@@ -9,11 +9,13 @@
 [ext_resource type="Script" path="res://gameplay/health/health_component.gd" id="8"]
 [ext_resource type="Script" path="res://gameplay/match/match_state_manager.gd" id="9"]
 [ext_resource type="Script" path="res://gameplay/respawn/respawn_system.gd" id="10"]
-[ext_resource type="Resource" path="res://data/config/default_hero.tres" id="11"]
+[ext_resource type="Resource" path="res://data/heroes/vex.tres" id="11"]
 [ext_resource type="Resource" path="res://data/config/default_match.tres" id="12"]
 [ext_resource type="PackedScene" path="res://ui/hud/game_hud.tscn" id="13"]
 [ext_resource type="Script" path="res://gameplay/hazards/hazard_system.gd" id="14"]
 [ext_resource type="Script" path="res://gameplay/score/score_system.gd" id="15"]
+[ext_resource type="Script" path="res://gameplay/hero/hero_level_system.gd" id="16"]
+[ext_resource type="PackedScene" path="res://ui/hero_select/hero_select.tscn" id="17"]
 
 [sub_resource type="CapsuleShape3D" id="1"]
 radius = 0.4
@@ -77,4 +79,9 @@ script = ExtResource("14")
 [node name="ScoreSystem" type="Node" parent="."]
 script = ExtResource("15")
 
+[node name="HeroLevelSystem" type="Node" parent="."]
+script = ExtResource("16")
+
 [node name="GameHUD" parent="." instance=ExtResource("13")]
+
+[node name="HeroSelect" parent="." instance=ExtResource("17")]

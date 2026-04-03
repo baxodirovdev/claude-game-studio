@@ -15,7 +15,9 @@ extends Node3D
 @onready var respawn_system: RespawnSystem = $RespawnSystem
 @onready var hazard_system: HazardSystem = $HazardSystem
 @onready var score_system: ScoreSystem = $ScoreSystem
+@onready var hero_level: HeroLevelSystem = $HeroLevelSystem
 @onready var hud: GameHUD = $GameHUD
+@onready var hero_select: HeroSelect = $HeroSelect
 
 ## Hero config resource — all per-hero tuning values.
 @export var hero_config: HeroConfig
@@ -24,11 +26,12 @@ extends Node3D
 
 # Dummy targets for testing (replaced by real players in multiplayer)
 var _targets: Array[Node3D] = []
+var _kill_streak: int = 0
 
 func _ready() -> void:
 	# Load default configs if not assigned in editor
 	if hero_config == null:
-		hero_config = preload("res://data/config/default_hero.tres")
+		hero_config = preload("res://data/heroes/vex.tres")
 	if match_config == null:
 		match_config = preload("res://data/config/default_match.tres")
 
@@ -41,6 +44,12 @@ func _ready() -> void:
 	player_health.max_health = hero_config.max_health
 	player_health.current_health = hero_config.max_health
 
+	# Apply hero color
+	var player_mesh: MeshInstance3D = player.get_node("MeshInstance3D")
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = hero_config.hero_color
+	player_mesh.material_override = mat
+
 	# Wire hook system and apply hero config
 	hook_system.player = player
 	hook_system.input_manager = input_manager
@@ -52,6 +61,7 @@ func _ready() -> void:
 	hook_system.hook_cooldown = hero_config.hook_cooldown
 	hook_system.hook_hitbox_radius = hero_config.hook_hitbox_radius
 	hook_system.pull_duration = hero_config.pull_duration
+	hook_system.hero_config = hero_config
 
 	# Wire player
 	player.input_manager = input_manager
@@ -59,8 +69,12 @@ func _ready() -> void:
 	# Wire input cooldown from config
 	input_manager.set_hook_cooldown(hero_config.hook_cooldown)
 
-	# Connect hook events for HUD stats display
-	hook_system.hook_hit.connect(func(_t: Node3D) -> void: hud.update_hook_stats())
+	# Wire hero level system
+	hero_level.hero_config = hero_config
+	hero_level.level_up.connect(_on_level_up)
+
+	# Connect hook events for HUD stats and XP
+	hook_system.hook_hit.connect(_on_hook_hit)
 	hook_system.hook_missed.connect(func() -> void: hud.update_hook_stats())
 	hook_system.target_killed.connect(_on_target_killed)
 
@@ -105,7 +119,10 @@ func _ready() -> void:
 	hud.match_state = match_state
 	hud.hook_system = hook_system
 	hud.score_system = score_system
+	hud.hero_level = hero_level
+	hud.hero_config = hero_config
 	hud.player = player
+	hud.setup_hero_display()
 
 func _on_arena_ready() -> void:
 	# Place player at middle Team A spawn
@@ -129,13 +146,74 @@ func _on_arena_ready() -> void:
 	# Spawn dummy targets on the enemy side
 	_spawn_dummy_targets()
 
-	# Start match flow (countdown → playing)
+	# Show hero selection — match starts after pick
+	hero_select.hero_selected.connect(_on_hero_selected)
+	hero_select.show_selection()
+
+func _on_hero_selected(config: HeroConfig) -> void:
+	_apply_hero_config(config)
 	match_state.start_match()
+
+func _apply_hero_config(config: HeroConfig) -> void:
+	hero_config = config
+
+	# Apply to player
+	player.move_speed = config.move_speed
+	var health: HealthComponent = player.get_node("HealthComponent")
+	health.max_health = config.max_health
+	health.current_health = config.max_health
+
+	# Apply hero color
+	var player_mesh: MeshInstance3D = player.get_node("MeshInstance3D")
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = config.hero_color
+	player_mesh.material_override = mat
+
+	# Apply to hook system
+	hook_system.hook_speed = config.hook_speed
+	hook_system.hook_return_speed = config.hook_return_speed
+	hook_system.hook_range = config.hook_range
+	hook_system.hook_damage = config.hook_damage
+	hook_system.hook_cooldown = config.hook_cooldown
+	hook_system.hook_hitbox_radius = config.hook_hitbox_radius
+	hook_system.pull_duration = config.pull_duration
+	hook_system.hero_config = config
+
+	# Apply to input
+	input_manager.set_hook_cooldown(config.hook_cooldown)
+
+	# Apply to hero level system
+	hero_level.hero_config = config
+	hero_level.reset()
+
+	# Update HUD
+	hud.health_component = health
+	hud.hero_config = config
+	hud.setup_hero_display()
 
 func _on_hook_fire_requested(facing_angle: float) -> void:
 	hook_system.fire(facing_angle)
 
+func _on_hook_hit(_target: Node3D) -> void:
+	hud.update_hook_stats()
+	hud.show_hit_marker()
+	hero_level.add_xp(hero_config.xp_on_hook_hit)
+	game_camera.shake(0.15)
+
+func _on_level_up(new_level: int) -> void:
+	# Apply new stats from level bonuses
+	player.move_speed = hero_level.get_effective_stat("move_speed")
+	hook_system.hook_damage = hero_level.get_effective_stat("hook_damage")
+	hook_system.hook_range = hero_level.get_effective_stat("hook_range")
+	hud.show_level_up(new_level)
+
 func _on_target_killed(target: Node3D, _damage_type: String) -> void:
+	# XP for kill and streak
+	hero_level.add_xp(hero_config.xp_on_kill)
+	game_camera.shake(0.3)
+	_kill_streak += 1
+	hud.show_kill_streak(_kill_streak)
+
 	# Route kill through score system
 	score_system.record_target_kill(player.team_id)
 	score_system._add_feed_entry(player, target, _damage_type)
@@ -199,10 +277,15 @@ func _on_player_respawned(respawn_player: PlayerController) -> void:
 		hud.reset_ghost()
 	hazard_system.clear_cooldowns_for(respawn_player)
 
-func _on_kill_occurred(killer_team: int, team_kills: Array[int]) -> void:
-	# Forward to match state for win condition check
-	match_state.team_kills = team_kills
-	if match_state.kill_target > 0 and team_kills[killer_team] >= match_state.kill_target:
+func _on_kill_occurred(killer_team: int, team_kills_arr: Array[int]) -> void:
+	# Forward to match state for win condition check (handles both PLAYING and OVERTIME)
+	match_state.team_kills = team_kills_arr
+	if match_state.current_state == MatchStateManager.State.OVERTIME:
+		# In overtime, any kill creating a lead ends the match
+		if team_kills_arr[0] != team_kills_arr[1]:
+			var winner := 0 if team_kills_arr[0] > team_kills_arr[1] else 1
+			match_state._end_match(winner, "overtime")
+	elif match_state.kill_target > 0 and team_kills_arr[killer_team] >= match_state.kill_target:
 		match_state._end_match(killer_team, "kill_target")
 	hud.update_scores()
 

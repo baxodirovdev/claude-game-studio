@@ -15,6 +15,10 @@ const GHOST_DECAY_SPEED := 3.0
 const LOW_HEALTH_THRESHOLD := 0.25
 const FINAL_COUNTDOWN_THRESHOLD := 30.0
 
+@onready var hero_name_label: Label = $TopLeft/HeroNameLabel
+@onready var level_label: Label = $TopLeft/LevelLabel
+@onready var xp_bar_fill: ColorRect = $TopLeft/XpBar/Fill
+@onready var level_up_label: Label = $Center/LevelUpLabel
 @onready var health_bar: ColorRect = $TopLeft/HealthBar/Fill
 @onready var health_ghost: ColorRect = $TopLeft/HealthBar/Ghost
 @onready var health_bar_bg: ColorRect = $TopLeft/HealthBar/Background
@@ -37,10 +41,13 @@ var health_component: HealthComponent
 var match_state: MatchStateManager
 var hook_system: HookSystem
 var score_system: ScoreSystem
+var hero_level: HeroLevelSystem
+var hero_config: HeroConfig
 var player: PlayerController
 
 var _ghost_fill: float = 1.0
 var _health_bar_max_width: float = 200.0
+var _xp_bar_max_width: float = 200.0
 var _timer_pulse_time: float = 0.0
 var _low_health_pulse_time: float = 0.0
 
@@ -49,14 +56,19 @@ func _ready() -> void:
 	result_label.visible = false
 	respawn_label.visible = false
 	invuln_label.visible = false
+	level_up_label.visible = false
 	timer_label.text = ""
 	score_label.text = ""
 	kill_target_label.text = ""
 	stats_label.text = ""
+	hero_name_label.text = ""
+	level_label.text = "Lv.1"
+	xp_bar_fill.size.x = 0
 
 func _process(delta: float) -> void:
 	_update_health_bar(delta)
 	_update_timer_pulse(delta)
+	_update_xp_bar()
 
 ## --- Health Bar ---
 
@@ -155,10 +167,17 @@ func on_match_state_changed(new_state: MatchStateManager.State) -> void:
 			show_go()
 			if match_state:
 				kill_target_label.text = "First to %d" % match_state.kill_target
+		MatchStateManager.State.OVERTIME:
+			hide_countdown()
+			timer_label.text = "OVERTIME"
+			timer_label.add_theme_color_override("font_color", Color.RED)
+			kill_target_label.text = "NEXT KILL WINS"
+			kill_target_label.add_theme_color_override("font_color", Color.RED)
 		MatchStateManager.State.ENDED:
 			hide_countdown()
 			timer_label.text = ""
 			timer_label.modulate.a = 1.0
+			kill_target_label.text = ""
 
 func show_match_result(winner_team: int, player_team: int) -> void:
 	result_label.visible = true
@@ -203,6 +222,53 @@ func update_kill_feed(entries: Array[Dictionary]) -> void:
 			label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3))
 
 		kill_feed_container.add_child(label)
+
+## --- Kill Streak ---
+
+func show_kill_streak(streak: int) -> void:
+	if streak >= 3:
+		countdown_label.text = "STREAK x%d!" % streak
+		countdown_label.add_theme_color_override("font_color", Color(1.0, 0.6, 0.1))
+		get_tree().create_timer(1.5).timeout.connect(func() -> void:
+			if countdown_label.text.begins_with("STREAK"):
+				countdown_label.text = ""
+				countdown_label.remove_theme_color_override("font_color")
+		)
+
+## --- Hit Marker ---
+
+func show_hit_marker() -> void:
+	countdown_label.text = "HOOKED!"
+	countdown_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))
+	get_tree().create_timer(0.8).timeout.connect(func() -> void:
+		if countdown_label.text == "HOOKED!":
+			countdown_label.text = ""
+			countdown_label.remove_theme_color_override("font_color")
+	)
+
+## --- Hero Info ---
+
+func setup_hero_display() -> void:
+	if hero_config:
+		hero_name_label.text = hero_config.display_name
+	update_level_display()
+
+func update_level_display() -> void:
+	if hero_level:
+		level_label.text = "Lv.%d" % hero_level.current_level
+
+func _update_xp_bar() -> void:
+	if hero_level == null:
+		return
+	xp_bar_fill.size.x = hero_level.get_xp_progress() * _xp_bar_max_width
+
+func show_level_up(new_level: int) -> void:
+	update_level_display()
+	level_up_label.text = "LEVEL %d" % new_level
+	level_up_label.visible = true
+	get_tree().create_timer(2.0).timeout.connect(func() -> void:
+		level_up_label.visible = false
+	)
 
 ## --- Hook Stats ---
 

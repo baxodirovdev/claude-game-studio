@@ -1,8 +1,8 @@
-## Match State Manager — controls match flow: countdown, playing, ended.
+## Match State Manager — controls match flow: countdown, playing, overtime, ended.
 ##
 ## Central authority for match lifecycle. Emits [signal match_state_changed] on
 ## every transition. Other systems listen to this signal to enable/disable behavior.
-## Implements GDD: design/gdd/match-state-manager.md (basic Sprint 1 subset).
+## Implements GDD: design/gdd/match-state-manager.md.
 class_name MatchStateManager
 extends Node
 
@@ -10,8 +10,9 @@ signal match_state_changed(new_state: State)
 signal countdown_tick(seconds_left: int)
 signal match_timer_updated(time_remaining: float)
 signal match_ended(winner_team: int, reason: String)
+signal overtime_started
 
-enum State { WAITING, COUNTDOWN, PLAYING, ENDED }
+enum State { WAITING, COUNTDOWN, PLAYING, OVERTIME, ENDED }
 
 ## Countdown duration in seconds before match starts.
 @export var countdown_duration: float = 3.0
@@ -21,6 +22,8 @@ enum State { WAITING, COUNTDOWN, PLAYING, ENDED }
 @export var ended_display_duration: float = 3.0
 ## Kill target — first team to this many kills wins. 0 = timer only.
 @export var kill_target: int = 20
+## Maximum overtime duration in seconds (0 = no limit).
+@export var overtime_max_duration: float = 60.0
 
 var current_state: State = State.WAITING
 var match_time_remaining: float = 0.0
@@ -30,6 +33,7 @@ var team_kills: Array[int] = [0, 0]
 
 var _countdown_remaining: float = 0.0
 var _ended_timer: float = 0.0
+var _overtime_elapsed: float = 0.0
 var _last_countdown_second: int = -1
 
 ## References set by Main.
@@ -46,7 +50,7 @@ func start_match() -> void:
 
 ## Register a kill for a team. Checks win condition.
 func register_kill(team_id: int) -> void:
-	if current_state != State.PLAYING:
+	if current_state != State.PLAYING and current_state != State.OVERTIME:
 		return
 	if team_id < 0 or team_id >= team_kills.size():
 		return
@@ -55,9 +59,18 @@ func register_kill(team_id: int) -> void:
 	# Check kill target win condition
 	if kill_target > 0 and team_kills[team_id] >= kill_target:
 		_end_match(team_id, "kill_target")
+		return
 
-## Returns formatted time string "M:SS".
+	# In overtime, any kill that creates a lead ends the match
+	if current_state == State.OVERTIME:
+		if team_kills[0] != team_kills[1]:
+			var winner := 0 if team_kills[0] > team_kills[1] else 1
+			_end_match(winner, "overtime")
+
+## Returns formatted time string "M:SS" or "OT" during overtime.
 func get_time_display() -> String:
+	if current_state == State.OVERTIME:
+		return "OT"
 	var total_seconds := ceili(match_time_remaining)
 	var minutes := total_seconds / 60
 	var seconds := total_seconds % 60
@@ -69,6 +82,8 @@ func _process(delta: float) -> void:
 			_process_countdown(delta)
 		State.PLAYING:
 			_process_playing(delta)
+		State.OVERTIME:
+			_process_overtime(delta)
 		State.ENDED:
 			_process_ended(delta)
 
@@ -90,14 +105,22 @@ func _process_playing(delta: float) -> void:
 
 	if match_time_remaining <= 0:
 		match_time_remaining = 0.0
-		# Timer expired — team with more kills wins
-		var winner := -1
-		if team_kills[0] > team_kills[1]:
-			winner = 0
-		elif team_kills[1] > team_kills[0]:
-			winner = 1
-		# If tied, it's a draw (winner = -1)
-		_end_match(winner, "timer" if winner >= 0 else "draw")
+		# Timer expired — check for tie
+		if team_kills[0] == team_kills[1]:
+			# Tied — enter overtime
+			_transition_to(State.OVERTIME)
+		else:
+			# Not tied — team with more kills wins
+			var winner := 0 if team_kills[0] > team_kills[1] else 1
+			_end_match(winner, "timer")
+
+func _process_overtime(delta: float) -> void:
+	_overtime_elapsed += delta
+	match_timer_updated.emit(0.0)
+
+	# Check overtime time limit
+	if overtime_max_duration > 0 and _overtime_elapsed >= overtime_max_duration:
+		_end_match(-1, "draw")
 
 func _process_ended(delta: float) -> void:
 	_ended_timer -= delta
@@ -120,6 +143,10 @@ func _transition_to(new_state: State) -> void:
 		State.PLAYING:
 			match_time_remaining = match_duration
 			_set_gameplay_enabled(true)
+		State.OVERTIME:
+			_overtime_elapsed = 0.0
+			_set_gameplay_enabled(true)
+			overtime_started.emit()
 		State.ENDED:
 			_ended_timer = ended_display_duration
 			_set_gameplay_enabled(false)
