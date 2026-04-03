@@ -24,6 +24,10 @@ var _last_hooker: Node = null
 var _last_hook_time: float = 0.0
 const KILL_CREDIT_WINDOW: float = 3.0
 
+## Recent damage dealers for assist tracking: [{ source: Node, time: float }]
+var _damage_history: Array[Dictionary] = []
+const ASSIST_WINDOW: float = 5.0
+
 func _ready() -> void:
 	current_health = max_health
 
@@ -32,6 +36,11 @@ func _process(delta: float) -> void:
 		_last_hook_time -= delta
 		if _last_hook_time <= 0:
 			_last_hooker = null
+
+	# Clean expired damage history
+	var current_time := Time.get_ticks_msec() / 1000.0
+	while _damage_history.size() > 0 and current_time - _damage_history[0]["time"] > ASSIST_WINDOW:
+		_damage_history.remove_at(0)
 
 ## Deal damage to this entity. Returns actual damage dealt.
 func take_damage(amount: float, source: Node, damage_type: String) -> float:
@@ -57,6 +66,10 @@ func take_damage(amount: float, source: Node, damage_type: String) -> float:
 		_last_hooker = source
 		_last_hook_time = KILL_CREDIT_WINDOW
 
+	# Record damage dealer for assist tracking
+	if source != null:
+		_damage_history.append({"source": source, "time": Time.get_ticks_msec() / 1000.0})
+
 	if current_health <= 0:
 		_die(source, damage_type)
 
@@ -68,6 +81,7 @@ func restore_full() -> void:
 	current_health = max_health
 	_last_hooker = null
 	_last_hook_time = 0.0
+	_damage_history.clear()
 	health_changed.emit(current_health, max_health)
 
 ## Grant invulnerability for a duration.
@@ -80,6 +94,18 @@ func grant_invulnerability(duration: float) -> void:
 ## Get the killer for hazard deaths (hooker within credit window, or null = suicide).
 func get_kill_credit_source() -> Node:
 	return _last_hooker
+
+## Get the most recent damage dealer (besides the killer) for assist credit.
+func get_assist_candidate(killer: Node) -> Node:
+	var current_time := Time.get_ticks_msec() / 1000.0
+	# Walk backwards to find most recent non-killer damage dealer
+	for i in range(_damage_history.size() - 1, -1, -1):
+		var entry: Dictionary = _damage_history[i]
+		if current_time - entry["time"] > ASSIST_WINDOW:
+			break
+		if entry["source"] != killer and entry["source"] != null:
+			return entry["source"]
+	return null
 
 func _die(source: Node, damage_type: String) -> void:
 	is_dead = true

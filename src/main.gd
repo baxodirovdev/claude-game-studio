@@ -18,6 +18,9 @@ extends Node3D
 @onready var hero_level: HeroLevelSystem = $HeroLevelSystem
 @onready var hud: GameHUD = $GameHUD
 @onready var hero_select: HeroSelect = $HeroSelect
+@onready var match_results: MatchResults = $MatchResults
+@onready var vfx_system: VFXSystem = $VFXSystem
+@onready var audio_system: AudioSystem = $AudioSystem
 
 ## Hero config resource — all per-hero tuning values.
 @export var hero_config: HeroConfig
@@ -73,9 +76,14 @@ func _ready() -> void:
 	hero_level.hero_config = hero_config
 	hero_level.level_up.connect(_on_level_up)
 
-	# Connect hook events for HUD stats and XP
+	# Connect hook events for HUD stats, XP, and VFX
 	hook_system.hook_hit.connect(_on_hook_hit)
-	hook_system.hook_missed.connect(func() -> void: hud.update_hook_stats())
+	hook_system.hook_missed.connect(func() -> void:
+		hud.update_hook_stats()
+		if audio_system:
+			audio_system.play_hook_miss()
+	)
+	hook_system.hook_fired.connect(_on_hook_fired)
 	hook_system.target_killed.connect(_on_target_killed)
 
 	# Wire match state manager and apply match config
@@ -105,6 +113,7 @@ func _ready() -> void:
 	score_system.register_player(player)
 	score_system.kill_occurred.connect(_on_kill_occurred)
 	score_system.kill_feed_updated.connect(_on_kill_feed_updated)
+	score_system.assist_awarded.connect(_on_assist_awarded)
 
 	# Wire hazard system and apply match config
 	hazard_system.arena = arena
@@ -124,6 +133,14 @@ func _ready() -> void:
 	hud.player = player
 	hud.setup_hero_display()
 
+	# Wire match results screen
+	match_results.score_system = score_system
+	match_results.hook_system = hook_system
+	match_results.hero_config = hero_config
+	match_results.player = player
+	match_results.match_config = match_config
+	match_results.play_again_requested.connect(_on_play_again)
+
 func _on_arena_ready() -> void:
 	# Place player at middle Team A spawn
 	var spawns := arena.get_spawn_points(0)
@@ -134,9 +151,14 @@ func _on_arena_ready() -> void:
 	game_camera.follow_target = player
 	game_camera.initialize()
 
-	# Connect player death to respawn flow
+	# Connect player death to respawn flow, score tracking, VFX, and audio
 	player.get_node("HealthComponent").died.connect(
 		func(victim: Node, killer: Node, dtype: String) -> void:
+			if vfx_system:
+				vfx_system.spawn_death_effect(player.global_position, hero_config.hero_color)
+			if audio_system:
+				audio_system.play_death()
+			score_system.record_kill(victim, killer, dtype)
 			player.kill(killer, dtype)
 	)
 
@@ -186,19 +208,32 @@ func _apply_hero_config(config: HeroConfig) -> void:
 	hero_level.hero_config = config
 	hero_level.reset()
 
-	# Update HUD
+	# Update HUD and results
 	hud.health_component = health
 	hud.hero_config = config
 	hud.setup_hero_display()
+	match_results.hero_config = config
 
 func _on_hook_fire_requested(facing_angle: float) -> void:
 	hook_system.fire(facing_angle)
+
+func _on_hook_fired() -> void:
+	# Attach trail particles to active projectile
+	if hook_system._active_projectile and vfx_system:
+		vfx_system.attach_hook_trail(hook_system._active_projectile, hero_config.hero_color)
+	if audio_system:
+		audio_system.play_hook_fire()
 
 func _on_hook_hit(_target: Node3D) -> void:
 	hud.update_hook_stats()
 	hud.show_hit_marker()
 	hero_level.add_xp(hero_config.xp_on_hook_hit)
 	game_camera.shake(0.15)
+	# Hit impact flash + sound
+	if vfx_system:
+		vfx_system.spawn_hit_flash(_target.global_position, hero_config.hero_color)
+	if audio_system:
+		audio_system.play_hook_hit()
 
 func _on_level_up(new_level: int) -> void:
 	# Apply new stats from level bonuses
@@ -213,6 +248,10 @@ func _on_target_killed(target: Node3D, _damage_type: String) -> void:
 	game_camera.shake(0.3)
 	_kill_streak += 1
 	hud.show_kill_streak(_kill_streak)
+	if audio_system:
+		audio_system.play_kill()
+	if vfx_system:
+		vfx_system.spawn_death_effect(target.global_position, Color.ORANGE)
 
 	# Route kill through score system
 	score_system.record_target_kill(player.team_id)
@@ -252,12 +291,16 @@ func _spawn_dummy_targets() -> void:
 
 func _on_countdown_tick(seconds_left: int) -> void:
 	hud.show_countdown(seconds_left)
+	if audio_system:
+		audio_system.play_countdown_beep()
 
 func _on_match_state_changed(new_state: MatchStateManager.State) -> void:
 	hud.on_match_state_changed(new_state)
 	match new_state:
 		MatchStateManager.State.PLAYING:
 			hazard_system.activate()
+			if audio_system:
+				audio_system.play_match_start()
 		MatchStateManager.State.ENDED:
 			hazard_system.deactivate()
 
@@ -276,6 +319,13 @@ func _on_player_respawned(respawn_player: PlayerController) -> void:
 		hud.hide_respawn()
 		hud.reset_ghost()
 	hazard_system.clear_cooldowns_for(respawn_player)
+	if audio_system:
+		audio_system.play_respawn()
+	# Respawn VFX
+	if vfx_system:
+		vfx_system.spawn_respawn_effect(respawn_player, hero_config.hero_color)
+		vfx_system.start_invuln_glow(respawn_player, hero_config.hero_color,
+			match_config.invulnerability_duration)
 
 func _on_kill_occurred(killer_team: int, team_kills_arr: Array[int]) -> void:
 	# Forward to match state for win condition check (handles both PLAYING and OVERTIME)
@@ -289,12 +339,67 @@ func _on_kill_occurred(killer_team: int, team_kills_arr: Array[int]) -> void:
 		match_state._end_match(killer_team, "kill_target")
 	hud.update_scores()
 
+func _on_assist_awarded(assister: Node) -> void:
+	if assister == player:
+		hero_level.add_xp(hero_config.xp_on_assist)
+
 func _on_kill_feed_updated(entries: Array[Dictionary]) -> void:
 	hud.update_kill_feed(entries)
 
 func _on_match_ended(winner_team: int, _reason: String) -> void:
 	hud.show_match_result(winner_team, player.team_id)
 	score_system.freeze()
+	# Show full results after brief delay for the victory/defeat text
+	get_tree().create_timer(match_config.ended_display_duration).timeout.connect(func() -> void:
+		hud.result_label.visible = false
+		match_results.show_results(winner_team, player.team_id)
+	)
+
+func _on_play_again() -> void:
+	# Reset score system
+	score_system._frozen = false
+	score_system.team_kills = [0, 0]
+	for pid: int in score_system.player_stats:
+		var stats: Dictionary = score_system.player_stats[pid]
+		stats["kills"] = 0
+		stats["deaths"] = 0
+		stats["assists"] = 0
+		stats["streak"] = 0
+		stats["best_streak"] = 0
+
+	# Reset hook stats
+	hook_system.hooks_fired = 0
+	hook_system.hooks_hit = 0
+	hook_system.hooks_missed = 0
+
+	# Reset match state
+	match_state.team_kills = [0, 0]
+
+	# Reset player
+	var health: HealthComponent = player.get_node("HealthComponent")
+	health.restore_full()
+	player.activate()
+	_kill_streak = 0
+
+	# Reset HUD
+	hud.update_scores()
+	hud.update_hook_stats()
+	hud.result_label.visible = false
+
+	# Reset dummy targets
+	for target: Node3D in _targets:
+		if is_instance_valid(target):
+			target.visible = true
+			target.global_position = target.get_meta("spawn_pos")
+			var col := target.get_node_or_null("CollisionShape3D")
+			if col:
+				col.disabled = false
+			var target_health: HealthComponent = target.get_node_or_null("HealthComponent")
+			if target_health:
+				target_health.restore_full()
+
+	# Show hero select to start new match
+	hero_select.show_selection()
 
 func _create_target(pos: Vector3) -> CharacterBody3D:
 	var body := CharacterBody3D.new()
@@ -328,5 +433,10 @@ func _create_target(pos: Vector3) -> CharacterBody3D:
 	health.died.connect(func(victim: Node, killer: Node, dtype: String) -> void:
 		hook_system.target_killed.emit(victim, dtype)
 	)
+
+	# Enemy health bar
+	var health_bar := EnemyHealthBar.new()
+	health_bar.health_component = health
+	body.add_child(health_bar)
 
 	return body

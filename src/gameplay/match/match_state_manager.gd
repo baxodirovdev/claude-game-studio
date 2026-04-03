@@ -161,3 +161,24 @@ func _freeze_all_players() -> void:
 	for player in players:
 		if is_instance_valid(player):
 			player.freeze()
+
+## --- Networking RPCs ---
+
+## Sync match state to all clients (called by server).
+@rpc("authority", "call_local", "reliable")
+func sync_match_state(state_id: int, time_remaining: float, kills: Array) -> void:
+	current_state = state_id as State
+	match_time_remaining = time_remaining
+	team_kills = [kills[0] as int, kills[1] as int]
+	match_state_changed.emit(current_state)
+
+## Sync countdown tick to clients.
+@rpc("authority", "call_local", "reliable")
+func sync_countdown(seconds_left: int) -> void:
+	countdown_tick.emit(seconds_left)
+
+## Sync match end to clients.
+@rpc("authority", "call_local", "reliable")
+func sync_match_ended(winner_team: int, reason: String) -> void:
+	_transition_to(State.ENDED)
+	match_ended.emit(winner_team, reason)

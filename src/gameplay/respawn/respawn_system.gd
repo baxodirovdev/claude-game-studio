@@ -127,3 +127,25 @@ func _find_health(node: Node) -> HealthComponent:
 		if child is HealthComponent:
 			return child as HealthComponent
 	return null
+
+## Clear a specific player's pending respawn (e.g., disconnect).
+func clear_pending_for(player: PlayerController) -> void:
+	for i in range(_pending.size() - 1, -1, -1):
+		if _pending[i]["player"] == player:
+			_pending.remove_at(i)
+
+## --- Networking RPCs ---
+
+## Server notifies all clients of a respawn.
+@rpc("authority", "call_local", "reliable")
+func sync_respawn(player_path: String, spawn_pos: Vector3) -> void:
+	var player := get_node_or_null(player_path) as PlayerController
+	if player == null:
+		return
+	player.global_position = spawn_pos
+	var health := _find_health(player)
+	if health:
+		health.restore_full()
+		health.grant_invulnerability(invulnerability_duration)
+	player.activate()
+	player_respawned.emit(player)

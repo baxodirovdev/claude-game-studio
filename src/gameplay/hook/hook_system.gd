@@ -243,3 +243,31 @@ func _find_health(node: Node) -> HealthComponent:
 
 func _ready() -> void:
 	set_physics_process(false)  # Only enable during pull monitoring
+
+## --- Networking RPCs ---
+
+## Request hook fire from client to server.
+@rpc("any_peer", "call_local", "reliable")
+func request_fire(facing: float) -> void:
+	if not multiplayer.is_server():
+		return
+	# Server validates and broadcasts
+	notify_fire.rpc(facing)
+
+## Notify all peers of a hook fire (broadcast by server).
+@rpc("authority", "call_local", "unreliable")
+func notify_fire(facing: float) -> void:
+	# Each client simulates the projectile locally
+	fire(facing)
+
+## Notify all peers of a hook hit (broadcast by server).
+@rpc("authority", "call_local", "reliable")
+func notify_hit(target_path: String) -> void:
+	var target := get_node_or_null(target_path)
+	if target:
+		hook_hit.emit(target)
+
+## Notify all peers of a hook miss (broadcast by server).
+@rpc("authority", "call_local", "reliable")
+func notify_miss() -> void:
+	hook_missed.emit()

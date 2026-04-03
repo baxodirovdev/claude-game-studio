@@ -8,6 +8,7 @@ extends Node
 
 signal kill_occurred(killer_team: int, team_kills: Array[int])
 signal kill_feed_updated(entries: Array[Dictionary])
+signal assist_awarded(assister: Node)
 
 ## Kill feed display duration (seconds).
 @export var kill_feed_duration: float = 5.0
@@ -35,6 +36,7 @@ func register_player(player: PlayerController) -> void:
 		"team_id": player.team_id,
 		"kills": 0,
 		"deaths": 0,
+		"assists": 0,
 		"streak": 0,
 		"best_streak": 0,
 	}
@@ -67,8 +69,25 @@ func record_kill(victim: Node, killer: Node, damage_type: String) -> void:
 			team_kills[killer_team] += 1
 			kill_occurred.emit(killer_team, team_kills)
 
+	# Check for assist
+	var assister := _get_assist_candidate(victim, killer)
+	if assister != null:
+		var assister_id := assister.get_instance_id()
+		if player_stats.has(assister_id):
+			player_stats[assister_id]["assists"] += 1
+			assist_awarded.emit(assister)
+
 	# Add kill feed entry
 	_add_feed_entry(killer, victim, damage_type)
+
+## Get the assist candidate from the victim's HealthComponent.
+func _get_assist_candidate(victim: Node, killer: Node) -> Node:
+	if victim == null:
+		return null
+	var health: HealthComponent = victim.get_node_or_null("HealthComponent")
+	if health == null:
+		return null
+	return health.get_assist_candidate(killer)
 
 ## Record a kill from a non-player source (e.g., dummy target killed by player).
 func record_target_kill(killer_team: int) -> void:
@@ -126,3 +145,31 @@ func _add_feed_entry(killer: Node, victim: Node, damage_type: String) -> void:
 
 	kill_feed_updated.emit(_kill_feed)
 	set_process(true)
+
+## --- Networking RPCs ---
+
+## Sync a kill event to all clients (called by server).
+@rpc("authority", "call_local", "reliable")
+func sync_kill(victim_name: String, killer_name: String, damage_type: String,
+		killer_team: int, new_team_kills: Array) -> void:
+	team_kills = [new_team_kills[0] as int, new_team_kills[1] as int]
+	kill_occurred.emit(killer_team, team_kills)
+	# Add to local kill feed
+	var entry: Dictionary = {
+		"killer_name": killer_name,
+		"victim_name": victim_name,
+		"type": damage_type,
+		"time": Time.get_ticks_msec() / 1000.0,
+		"is_suicide": killer_name == "" or killer_name == victim_name,
+	}
+	_kill_feed.append(entry)
+	while _kill_feed.size() > kill_feed_max_entries:
+		_kill_feed.remove_at(0)
+	kill_feed_updated.emit(_kill_feed)
+	set_process(true)
+
+## Sync assist to a specific client.
+@rpc("authority", "call_local", "reliable")
+func sync_assist(assister_name: String) -> void:
+	# Client-side notification for assist XP
+	assist_awarded.emit(null)  # Signal for local XP handling
