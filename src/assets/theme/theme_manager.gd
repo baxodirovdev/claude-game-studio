@@ -1,7 +1,7 @@
 ## Theme Manager — applies the game theme to the root viewport on startup.
 ##
-## Register as autoload to apply consistent styling across all scenes.
-class_name ThemeManager
+## Registered as autoload in project.godot. No class_name to avoid
+## conflicting with the autoload singleton name.
 extends Node
 
 func _ready() -> void:

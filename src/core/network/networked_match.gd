@@ -11,7 +11,7 @@ signal player_disconnected(peer_id: int, forfeit: bool)
 signal opponent_disconnected_display(message: String)
 
 ## References set by the scene that owns this node.
-var network_manager: NetworkManager
+var network_manager: Node  # NetworkManager autoload
 var match_state: MatchStateManager
 var score_system: ScoreSystem
 var respawn_system: RespawnSystem

@@ -403,7 +403,7 @@ func _on_match_ended(winner_team: int, _reason: String) -> void:
 	)
 
 func _on_return_to_menu() -> void:
-	var flow := get_node_or_null("/root/SceneFlowManager") as SceneFlowManager
+	var flow := get_node_or_null("/root/SceneFlowManager")
 	if flow:
 		flow.go_to_main_menu()
 	else:

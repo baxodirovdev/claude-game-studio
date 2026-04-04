@@ -4,7 +4,7 @@
 ## Main Menu → Lobby/Hero Select → Game → Results → Main Menu.
 ## Provides fade-in/out transitions and prevents duplicate transitions.
 ## Sprint 4 S4-03.
-class_name SceneFlowManager
+## Registered as autoload — no class_name to avoid singleton name conflict.
 extends CanvasLayer
 
 signal transition_started

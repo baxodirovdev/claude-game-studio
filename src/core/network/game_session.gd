@@ -16,7 +16,7 @@ var player_scene: PackedScene
 var spawned_players: Dictionary = {}
 
 ## Reference to network manager (null in single-player).
-var network_manager: NetworkManager
+var network_manager: Node  # NetworkManager autoload
 
 ## Spawn a player for the given peer ID at the given position.
 func spawn_player(peer_id: int, team_id: int, spawn_pos: Vector3, hero_config: HeroConfig) -> PlayerController:

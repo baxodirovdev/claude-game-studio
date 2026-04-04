@@ -9,7 +9,7 @@ extends CanvasLayer
 signal match_start_requested(player_configs: Dictionary)
 
 ## References set by Main/Menu.
-var network_manager: NetworkManager
+var network_manager: Node  # NetworkManager autoload
 
 ## Hero config resources.
 var _hero_configs: Dictionary = {}

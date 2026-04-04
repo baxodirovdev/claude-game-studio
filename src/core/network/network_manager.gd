@@ -3,7 +3,7 @@
 ## Autoload singleton. Handles ENet (LAN) and WebSocket (online) peer creation.
 ## Tracks connected players and emits signals for lobby and game systems.
 ## Implements ADR-001.
-class_name NetworkManager
+## Registered as autoload — no class_name to avoid singleton name conflict.
 extends Node
 
 signal player_joined(peer_id: int)

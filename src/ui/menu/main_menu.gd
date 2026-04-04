@@ -41,7 +41,7 @@ func _ready() -> void:
 	# Wire NetworkManager autoload into LobbyScreen
 	var lobby := get_node_or_null("LobbyScreen") as LobbyScreen
 	if lobby:
-		lobby.network_manager = get_node_or_null("/root/NetworkManager") as NetworkManager
+		lobby.network_manager = get_node_or_null("/root/NetworkManager")
 		lobby.visible = false
 
 	play_solo_button.grab_focus()
@@ -69,5 +69,5 @@ func _on_quit() -> void:
 	else:
 		get_tree().quit()
 
-func _get_scene_flow() -> SceneFlowManager:
-	return get_node_or_null("/root/SceneFlowManager") as SceneFlowManager
+func _get_scene_flow() -> Node:
+	return get_node_or_null("/root/SceneFlowManager")
