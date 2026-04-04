@@ -1,34 +1,23 @@
-## Hero Selection UI — simple pre-match hero picker with 3 buttons.
+## Hero Selection UI — Pudge-only mode.
 ##
-## Shown before countdown. Player taps a hero button to select.
-## Emits hero_selected with the chosen HeroConfig. Default = Vex.
+## Auto-selects Pudge and starts the match immediately.
+## No other heroes are selectable or spawnable.
 class_name HeroSelect
 extends CanvasLayer
 
 signal hero_selected(config: HeroConfig)
 
-var _vex_config: HeroConfig = preload("res://data/heroes/vex.tres")
-var _lash_config: HeroConfig = preload("res://data/heroes/lash.tres")
-var _maw_config: HeroConfig = preload("res://data/heroes/maw.tres")
-var _flux_config: HeroConfig = preload("res://data/heroes/flux.tres")
-var _coil_config: HeroConfig = preload("res://data/heroes/coil.tres")
+var _pudge_config: HeroConfig = preload("res://data/heroes/pudge.tres")
 
-@onready var vex_button: Button = $Panel/VBox/VexButton
-@onready var lash_button: Button = $Panel/VBox/LashButton
-@onready var maw_button: Button = $Panel/VBox/MawButton
-@onready var flux_button: Button = $Panel/VBox/FluxButton
-@onready var coil_button: Button = $Panel/VBox/CoilButton
 @onready var panel: PanelContainer = $Panel
 
 func _ready() -> void:
-	vex_button.pressed.connect(func() -> void: _select(_vex_config))
-	lash_button.pressed.connect(func() -> void: _select(_lash_config))
-	maw_button.pressed.connect(func() -> void: _select(_maw_config))
-	flux_button.pressed.connect(func() -> void: _select(_flux_config))
-	coil_button.pressed.connect(func() -> void: _select(_coil_config))
+	pass
 
 func show_selection() -> void:
-	visible = true
+	# Pudge-only mode: auto-select and start immediately
+	visible = false
+	_select(_pudge_config)
 
 func hide_selection() -> void:
 	visible = false

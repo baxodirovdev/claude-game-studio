@@ -13,46 +13,7 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -160.0
-offset_top = -200.0
+offset_top = -60.0
 offset_right = 160.0
-offset_bottom = 200.0
-
-[node name="VBox" type="VBoxContainer" parent="Panel"]
-layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="Title" type="Label" parent="Panel/VBox"]
-layout_mode = 2
-text = "SELECT HERO"
-horizontal_alignment = 1
-theme_override_font_sizes/font_size = 24
-
-[node name="VexButton" type="Button" parent="Panel/VBox"]
-layout_mode = 2
-custom_minimum_size = Vector2(0, 50)
-text = "VEX — Chain Puller"
-theme_override_font_sizes/font_size = 18
-
-[node name="LashButton" type="Button" parent="Panel/VBox"]
-layout_mode = 2
-custom_minimum_size = Vector2(0, 50)
-text = "LASH — Grapple Swinger"
-theme_override_font_sizes/font_size = 18
-
-[node name="MawButton" type="Button" parent="Panel/VBox"]
-layout_mode = 2
-custom_minimum_size = Vector2(0, 50)
-text = "MAW — Boomerang Blader"
-theme_override_font_sizes/font_size = 18
-
-[node name="FluxButton" type="Button" parent="Panel/VBox"]
-layout_mode = 2
-custom_minimum_size = Vector2(0, 50)
-text = "FLUX — Magnetic Beam"
-theme_override_font_sizes/font_size = 18
-
-[node name="CoilButton" type="Button" parent="Panel/VBox"]
-layout_mode = 2
-custom_minimum_size = Vector2(0, 50)
-text = "COIL — Spring Charger"
-theme_override_font_sizes/font_size = 18
+offset_bottom = 60.0
+visible = false

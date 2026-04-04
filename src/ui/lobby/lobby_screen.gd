@@ -32,7 +32,7 @@ var _hero_configs: Dictionary = {}
 @onready var start_label: Label = $LobbyPanel/VBox/StartLabel
 @onready var disconnect_button: Button = $LobbyPanel/VBox/DisconnectButton
 
-var _selected_hero_path: String = "res://data/heroes/vex.tres"
+var _selected_hero_path: String = "res://data/heroes/pudge.tres"
 var _is_ready: bool = false
 
 func _ready() -> void:
@@ -45,7 +45,7 @@ func _ready() -> void:
 	disconnect_button.pressed.connect(_on_disconnect_pressed)
 	ready_button.pressed.connect(_on_ready_pressed)
 
-	vex_button.pressed.connect(func() -> void: _select_hero("res://data/heroes/vex.tres"))
+	vex_button.pressed.connect(func() -> void: _select_hero("res://data/heroes/pudge.tres"))
 	lash_button.pressed.connect(func() -> void: _select_hero("res://data/heroes/lash.tres"))
 	maw_button.pressed.connect(func() -> void: _select_hero("res://data/heroes/maw.tres"))
 
@@ -128,7 +128,7 @@ func _select_hero(config_path: String) -> void:
 	lash_button.modulate = Color.WHITE
 	maw_button.modulate = Color.WHITE
 	match config_path:
-		"res://data/heroes/vex.tres":
+		"res://data/heroes/pudge.tres":
 			vex_button.modulate = Color(0.5, 1.0, 0.5)
 		"res://data/heroes/lash.tres":
 			lash_button.modulate = Color(0.5, 1.0, 0.5)
@@ -204,7 +204,7 @@ func _check_all_ready() -> void:
 	for pid: int in network_manager.player_info:
 		var info: Dictionary = network_manager.player_info[pid]
 		configs[pid] = {
-			"hero_config_path": info.get("hero_config_path", "res://data/heroes/vex.tres"),
+			"hero_config_path": info.get("hero_config_path", "res://data/heroes/pudge.tres"),
 			"team_id": info.get("team_id", 0),
 		}
 
@@ -217,18 +217,10 @@ func _check_all_ready() -> void:
 
 func _hero_path_to_name(path: String) -> String:
 	match path:
-		"res://data/heroes/vex.tres":
-			return "Vex"
-		"res://data/heroes/lash.tres":
-			return "Lash"
-		"res://data/heroes/maw.tres":
-			return "Maw"
-		"res://data/heroes/flux.tres":
-			return "Flux"
-		"res://data/heroes/coil.tres":
-			return "Coil"
+		"res://data/heroes/pudge.tres":
+			return "Pudge"
 		_:
-			return "Vex"
+			return "Pudge"
 
 func _get_local_ip() -> String:
 	var addresses := IP.get_local_addresses()

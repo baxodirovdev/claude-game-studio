@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="HeroConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/config/hero_config.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+hero_id = "pudge"
+display_name = "Pudge"
+hook_type = 0
+hero_color = Color(0.5, 0.8, 0.2, 1)
+move_speed = 8.0
+max_health = 150.0
+hook_speed = 28.0
+hook_return_speed = 40.0
+hook_range = 22.0
+hook_damage = 99999.0
+hook_cooldown = 3.0
+hook_hitbox_radius = 1.2
+pull_duration = 0.6
+grapple_duration = 0.4
+boomerang_return_damage = 0.0
+boomerang_return_hitbox_mult = 1.0
+charge_min_time = 0.3
+charge_max_time = 2.0
+charge_damage_mult = 1.0
+charge_range_mult = 1.0
+beam_duration = 0.0
+beam_dps = 0.0
+beam_aim_cone = 0.0
+beam_pull_speed = 0.0
+xp_on_hook_hit = 0
+xp_on_kill = 50
+xp_on_assist = 25
+level_2_threshold = 100
+level_3_threshold = 300
+level_2_damage_bonus = 0.0
+level_2_speed_bonus = 0.05
+level_3_damage_bonus = 0.0
+level_3_speed_bonus = 0.10
+level_3_range_bonus = 0.10

@@ -37,7 +37,7 @@ var _kill_streak: int = 0
 func _ready() -> void:
 	# Load default configs if not assigned in editor
 	if hero_config == null:
-		hero_config = preload("res://data/heroes/vex.tres")
+		hero_config = preload("res://data/heroes/pudge.tres")
 	if match_config == null:
 		match_config = preload("res://data/config/default_match.tres")
 

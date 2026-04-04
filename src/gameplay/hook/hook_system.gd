@@ -231,6 +231,12 @@ func _physics_process(delta: float) -> void:
 
 	# Check if pull completed (target returned to ACTIVE state)
 	if _pull_target.state != PlayerController.State.PULLED:
+		# Death on pull completion — kill target when pull finishes
+		var pull_health := _find_health(_pull_target)
+		if pull_health and not pull_health.is_dead:
+			pull_health.take_damage(99999, player, "HOOK")
+			if pull_health.is_dead:
+				target_killed.emit(_pull_target, "HOOK")
 		_pull_target = null
 		set_physics_process(false)
 
