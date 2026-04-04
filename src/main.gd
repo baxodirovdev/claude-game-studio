@@ -81,7 +81,7 @@ func _ready() -> void:
 	hook_system.hook_missed.connect(func() -> void:
 		hud.update_hook_stats()
 		if audio_system:
-			audio_system.play_hook_miss()
+			audio_system.play_hook_miss(hero_config.hook_type)
 	)
 	hook_system.hook_fired.connect(_on_hook_fired)
 	hook_system.target_killed.connect(_on_target_killed)
@@ -218,22 +218,22 @@ func _on_hook_fire_requested(facing_angle: float) -> void:
 	hook_system.fire(facing_angle)
 
 func _on_hook_fired() -> void:
-	# Attach trail particles to active projectile
+	# Attach per-hero trail particles to active projectile
 	if hook_system._active_projectile and vfx_system:
-		vfx_system.attach_hook_trail(hook_system._active_projectile, hero_config.hero_color)
+		vfx_system.attach_hero_hook_trail(hook_system._active_projectile, hero_config)
 	if audio_system:
-		audio_system.play_hook_fire()
+		audio_system.play_hook_fire(hero_config.hook_type)
 
 func _on_hook_hit(_target: Node3D) -> void:
 	hud.update_hook_stats()
 	hud.show_hit_marker()
 	hero_level.add_xp(hero_config.xp_on_hook_hit)
 	game_camera.shake(0.15)
-	# Hit impact flash + sound
+	# Per-hero hit flash + sound
 	if vfx_system:
-		vfx_system.spawn_hit_flash(_target.global_position, hero_config.hero_color)
+		vfx_system.spawn_hero_hit_flash(_target.global_position, hero_config)
 	if audio_system:
-		audio_system.play_hook_hit()
+		audio_system.play_hook_hit(hero_config.hook_type)
 
 func _on_level_up(new_level: int) -> void:
 	# Apply new stats from level bonuses
@@ -247,9 +247,11 @@ func _on_target_killed(target: Node3D, _damage_type: String) -> void:
 	hero_level.add_xp(hero_config.xp_on_kill)
 	game_camera.shake(0.3)
 	_kill_streak += 1
-	hud.show_kill_streak(_kill_streak)
+	hud.show_kill_announcement(_kill_streak)
 	if audio_system:
-		audio_system.play_kill()
+		audio_system.play_kill(hud._multi_kill_count)
+		if _kill_streak >= 3:
+			audio_system.play_streak(_kill_streak)
 	if vfx_system:
 		vfx_system.spawn_death_effect(target.global_position, Color.ORANGE)
 
@@ -301,8 +303,14 @@ func _on_match_state_changed(new_state: MatchStateManager.State) -> void:
 			hazard_system.activate()
 			if audio_system:
 				audio_system.play_match_start()
+				audio_system.start_ambient()
+		MatchStateManager.State.OVERTIME:
+			if audio_system:
+				audio_system.set_overtime_ambient()
 		MatchStateManager.State.ENDED:
 			hazard_system.deactivate()
+			if audio_system:
+				audio_system.stop_ambient()
 
 func _on_match_timer_updated(time_remaining: float) -> void:
 	# Sync score system kills to match state for timer-based win check
@@ -342,6 +350,7 @@ func _on_kill_occurred(killer_team: int, team_kills_arr: Array[int]) -> void:
 func _on_assist_awarded(assister: Node) -> void:
 	if assister == player:
 		hero_level.add_xp(hero_config.xp_on_assist)
+		hud.show_assist()
 
 func _on_kill_feed_updated(entries: Array[Dictionary]) -> void:
 	hud.update_kill_feed(entries)

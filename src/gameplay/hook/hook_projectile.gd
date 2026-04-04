@@ -39,8 +39,13 @@ var _chain_mat: StandardMaterial3D
 # Arena bounds for wall collision (set by HookSystem)
 var arena_bounds: Dictionary = {}
 
+# Cached targets — populated once on ready, avoids per-frame tree queries
+var _cached_targets: Array[Node] = []
+
 func _ready() -> void:
 	_create_visuals()
+	# Cache hookable targets once on spawn instead of querying every frame
+	_cached_targets = get_tree().get_nodes_in_group(target_group)
 
 func _physics_process(delta: float) -> void:
 	if _returning:
@@ -64,7 +69,7 @@ func _process_forward(delta: float) -> void:
 		return
 
 	# Check collision with targets
-	for target in get_tree().get_nodes_in_group(target_group):
+	for target in _cached_targets:
 		if target == owner_node:
 			continue
 		if not target.visible:
@@ -109,7 +114,7 @@ func _process_return(delta: float) -> void:
 	# Boomerang: check for hits on return pass
 	if is_boomerang:
 		var check_radius := return_hitbox_radius + 0.5
-		for target in get_tree().get_nodes_in_group(target_group):
+		for target in _cached_targets:
 			if target == owner_node:
 				continue
 			if not target.visible:

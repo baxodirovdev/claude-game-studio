@@ -6,6 +6,10 @@
 class_name MatchConfig
 extends Resource
 
+@export_group("Arena")
+## Arena data resource to use for this match.
+@export var arena_data: ArenaData
+
 @export_group("Match Flow")
 ## Countdown before match starts (seconds).
 @export var countdown_duration: float = 3.0

@@ -1,12 +1,209 @@
 ## VFX System — manages visual effects for hooks, hits, deaths, and respawns.
 ##
 ## Creates GPU particle effects and mesh-based flashes. All effects are fire-and-forget.
-## Colors are driven by hero config. Purely visual — no gameplay logic.
-## Sprint 3 S3-07.
+## Colors are driven by hero config. Per-hero variants use different particle shapes,
+## counts, and behaviors. Purely visual — no gameplay logic.
+## Sprint 3 S3-07, Sprint 4 S4-04 (per-hero differentiation).
 class_name VFXSystem
 extends Node3D
 
-## --- Hook Trail ---
+## --- Per-Hero Hook Trail (S4-04) ---
+
+## Attach hero-specific hook trail particles to a projectile.
+func attach_hero_hook_trail(projectile: Node3D, hero_config: HeroConfig) -> GPUParticles3D:
+	match hero_config.hook_type:
+		HeroConfig.HookType.PULL:
+			return _attach_pull_trail(projectile, hero_config.hero_color)
+		HeroConfig.HookType.GRAPPLE:
+			return _attach_grapple_trail(projectile, hero_config.hero_color)
+		HeroConfig.HookType.BOOMERANG:
+			return _attach_boomerang_trail(projectile, hero_config.hero_color)
+		_:
+			return attach_hook_trail(projectile, hero_config.hero_color)
+
+## Vex (PULL): Electric blue chain sparks — tight, focused, crackling.
+func _attach_pull_trail(projectile: Node3D, color: Color) -> GPUParticles3D:
+	var particles := GPUParticles3D.new()
+	particles.amount = 25
+	particles.lifetime = 0.3
+	particles.emitting = true
+	particles.one_shot = false
+
+	var mat := ParticleProcessMaterial.new()
+	mat.direction = Vector3(0, 0, 0)
+	mat.spread = 5.0  # Tight — chain sparks
+	mat.initial_velocity_min = 1.0
+	mat.initial_velocity_max = 3.0
+	mat.gravity = Vector3.ZERO
+	mat.scale_min = 0.02
+	mat.scale_max = 0.08
+	mat.color = Color(color.r * 1.3, color.g * 1.3, color.b * 1.5)  # Bright electric
+
+	particles.process_material = mat
+
+	# Small cubes for spark-like appearance
+	var draw_pass := BoxMesh.new()
+	draw_pass.size = Vector3(0.04, 0.04, 0.04)
+	particles.draw_pass_1 = draw_pass
+
+	projectile.add_child(particles)
+	return particles
+
+## Lash (GRAPPLE): Green energy trail — wispy, flowing, tether-like.
+func _attach_grapple_trail(projectile: Node3D, color: Color) -> GPUParticles3D:
+	var particles := GPUParticles3D.new()
+	particles.amount = 15
+	particles.lifetime = 0.6
+	particles.emitting = true
+	particles.one_shot = false
+
+	var mat := ParticleProcessMaterial.new()
+	mat.direction = Vector3(0, 1, 0)
+	mat.spread = 20.0  # Wider — energy wisps
+	mat.initial_velocity_min = 0.3
+	mat.initial_velocity_max = 1.0
+	mat.gravity = Vector3(0, 0.5, 0)  # Slight float up
+	mat.scale_min = 0.06
+	mat.scale_max = 0.2
+	mat.color = Color(color.r, color.g * 1.2, color.b, 0.7)  # Semi-transparent
+
+	particles.process_material = mat
+
+	var draw_pass := SphereMesh.new()
+	draw_pass.radius = 0.08
+	draw_pass.height = 0.16
+	particles.draw_pass_1 = draw_pass
+
+	projectile.add_child(particles)
+	return particles
+
+## Maw (BOOMERANG): Orange spinning embers — wide, fiery, aggressive.
+func _attach_boomerang_trail(projectile: Node3D, color: Color) -> GPUParticles3D:
+	var particles := GPUParticles3D.new()
+	particles.amount = 35
+	particles.lifetime = 0.5
+	particles.emitting = true
+	particles.one_shot = false
+
+	var mat := ParticleProcessMaterial.new()
+	mat.direction = Vector3(0, 0, 0)
+	mat.spread = 45.0  # Wide — spinning disc sheds embers everywhere
+	mat.initial_velocity_min = 1.0
+	mat.initial_velocity_max = 4.0
+	mat.gravity = Vector3(0, -2, 0)  # Embers fall slightly
+	mat.scale_min = 0.03
+	mat.scale_max = 0.12
+	mat.color = Color(color.r * 1.2, color.g * 0.8, 0.1)  # Hot orange-yellow
+
+	particles.process_material = mat
+
+	# Flat quads for ember look
+	var draw_pass := QuadMesh.new()
+	draw_pass.size = Vector2(0.06, 0.06)
+	particles.draw_pass_1 = draw_pass
+
+	projectile.add_child(particles)
+	return particles
+
+## --- Per-Hero Hit Flash (S4-04) ---
+
+## Spawn hero-specific hit impact effect.
+func spawn_hero_hit_flash(position: Vector3, hero_config: HeroConfig) -> void:
+	match hero_config.hook_type:
+		HeroConfig.HookType.PULL:
+			# Electric burst — multiple small flashes
+			spawn_hit_flash(position, hero_config.hero_color)
+			_spawn_spark_burst(position, hero_config.hero_color, 8)
+		HeroConfig.HookType.GRAPPLE:
+			# Green energy slash — elongated flash
+			_spawn_slash_flash(position, hero_config.hero_color)
+		HeroConfig.HookType.BOOMERANG:
+			# Orange explosion — larger, fiery
+			_spawn_explosion_flash(position, hero_config.hero_color)
+		_:
+			spawn_hit_flash(position, hero_config.hero_color)
+
+func _spawn_spark_burst(position: Vector3, color: Color, count: int) -> void:
+	for i in range(count):
+		var spark := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(0.05, 0.05, 0.15)
+		spark.mesh = box
+
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color(color.r * 1.5, color.g * 1.5, color.b * 1.5, 0.9)
+		mat.emission_enabled = true
+		mat.emission = color
+		mat.emission_energy_multiplier = 4.0
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		spark.material_override = mat
+
+		add_child(spark)
+		spark.global_position = position + Vector3(0, 0.5, 0)
+
+		# Random direction
+		var angle := randf() * TAU
+		var dir := Vector3(cos(angle), randf_range(0.3, 1.0), sin(angle)) * randf_range(0.5, 1.5)
+		var tween := create_tween()
+		tween.set_parallel(true)
+		tween.tween_property(spark, "position", spark.position + dir, 0.2)
+		tween.tween_property(mat, "albedo_color:a", 0.0, 0.2)
+		tween.chain().tween_callback(spark.queue_free)
+
+func _spawn_slash_flash(position: Vector3, color: Color) -> void:
+	var slash := MeshInstance3D.new()
+	var quad := QuadMesh.new()
+	quad.size = Vector2(1.5, 0.3)
+	slash.mesh = quad
+
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(color.r, color.g, color.b, 0.9)
+	mat.emission_enabled = true
+	mat.emission = color
+	mat.emission_energy_multiplier = 3.0
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	slash.material_override = mat
+
+	add_child(slash)
+	slash.global_position = position + Vector3(0, 0.5, 0)
+	slash.rotation.z = randf_range(-0.3, 0.3)
+
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(slash, "scale", Vector3(2.0, 0.5, 1.0), 0.25)
+	tween.tween_property(mat, "albedo_color:a", 0.0, 0.25)
+	tween.chain().tween_callback(slash.queue_free)
+
+func _spawn_explosion_flash(position: Vector3, color: Color) -> void:
+	# Larger sphere with fiery colors
+	var flash := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.8
+	sphere.height = 1.6
+	flash.mesh = sphere
+
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(color.r, color.g * 0.6, 0.1, 0.9)
+	mat.emission_enabled = true
+	mat.emission = Color(1.0, 0.5, 0.1)
+	mat.emission_energy_multiplier = 5.0
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	flash.material_override = mat
+
+	add_child(flash)
+	flash.global_position = position + Vector3(0, 0.5, 0)
+
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(flash, "scale", Vector3(2.5, 2.5, 2.5), 0.35)
+	tween.tween_property(mat, "albedo_color:a", 0.0, 0.35)
+	tween.chain().tween_callback(flash.queue_free)
+
+## --- Hook Trail (generic fallback) ---
 
 ## Spawn a trail of particles behind the hook projectile.
 func attach_hook_trail(projectile: Node3D, color: Color) -> GPUParticles3D:

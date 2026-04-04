@@ -12,6 +12,8 @@ signal hook_fire_requested(facing_angle: float)
 @onready var hook_button: HookButton = $HookButton
 
 var _enabled: bool = true
+## When true, hook is on left side, joystick on right (left-handed mode).
+var left_handed: bool = false
 
 ## Returns the current movement direction (normalized or zero).
 func get_movement_vector() -> Vector2:
@@ -72,7 +74,11 @@ func _route_touch(event: InputEventScreenTouch) -> void:
 	var half_x := screen_size.x / 2.0
 
 	if event.pressed:
-		if event.position.x < half_x:
+		# Left-handed: hook on left, joystick on right
+		# Right-handed (default): joystick on left, hook on right
+		var is_left_side := event.position.x < half_x
+		var is_joystick_side := is_left_side != left_handed
+		if is_joystick_side:
 			joystick.handle_touch(event)
 		else:
 			hook_button.handle_touch(event)
