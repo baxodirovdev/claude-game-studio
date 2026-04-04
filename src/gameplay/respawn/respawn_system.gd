@@ -100,8 +100,10 @@ func _select_spawn_point(team_id: int) -> Vector3:
 	# Find living enemies to pick safest spawn
 	var enemies: Array[Node3D] = []
 	for node in get_tree().get_nodes_in_group("hookable"):
-		if is_instance_valid(node) and node.visible:
-			enemies.append(node)
+		if node is Node3D and is_instance_valid(node):
+			var n3d := node as Node3D
+			if n3d.visible:
+				enemies.append(n3d)
 
 	if enemies.is_empty():
 		# No enemies — pick middle spawn

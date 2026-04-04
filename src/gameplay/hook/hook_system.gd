@@ -406,7 +406,10 @@ func _find_beam_target(direction: Vector3) -> Node3D:
 	var best_target: Node3D = null
 	var best_dist := INF
 
-	for target in get_tree().get_nodes_in_group("hookable"):
+	for node in get_tree().get_nodes_in_group("hookable"):
+		if not node is Node3D:
+			continue
+		var target := node as Node3D
 		if target == player:
 			continue
 		if not target.visible:

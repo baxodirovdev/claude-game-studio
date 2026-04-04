@@ -182,9 +182,9 @@ func _update_player_list() -> void:
 	for pid: int in network_manager.player_info:
 		var info: Dictionary = network_manager.player_info[pid]
 		var label := Label.new()
-		var team_name := "Team A" if info.get("team_id", 0) == 0 else "Team B"
-		var ready_text := " [READY]" if info.get("ready", false) else ""
-		var hero_name := _hero_path_to_name(info.get("hero_config_path", ""))
+		var team_name: String = "Team A" if (info.get("team_id", 0) as int) == 0 else "Team B"
+		var ready_text: String = " [READY]" if info.get("ready", false) else ""
+		var hero_name: String = _hero_path_to_name(info.get("hero_config_path", "") as String)
 		var is_local := " (You)" if pid == network_manager.local_peer_id else ""
 		label.text = "Player %d%s — %s — %s%s" % [pid, is_local, team_name, hero_name, ready_text]
 		label.add_theme_font_size_override("font_size", 16)

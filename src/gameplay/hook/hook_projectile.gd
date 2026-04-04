@@ -40,12 +40,14 @@ var _chain_mat: StandardMaterial3D
 var arena_bounds: Dictionary = {}
 
 # Cached targets — populated once on ready, avoids per-frame tree queries
-var _cached_targets: Array[Node] = []
+var _cached_targets: Array[Node3D] = []
 
 func _ready() -> void:
 	_create_visuals()
 	# Cache hookable targets once on spawn instead of querying every frame
-	_cached_targets = get_tree().get_nodes_in_group(target_group)
+	for node in get_tree().get_nodes_in_group(target_group):
+		if node is Node3D:
+			_cached_targets.append(node as Node3D)
 
 func _physics_process(delta: float) -> void:
 	if _returning:

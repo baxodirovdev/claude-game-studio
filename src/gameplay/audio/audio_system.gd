@@ -70,19 +70,19 @@ func _ready() -> void:
 	}
 
 ## Play hook fire sound for a specific hero type.
-func play_hook_fire(hook_type: int = HeroConfig.HookType.PULL) -> void:
+func play_hook_fire(hook_type: HeroConfig.HookType = HeroConfig.HookType.PULL) -> void:
 	var sfx: Dictionary = _hero_sfx.get(hook_type, _hero_sfx.get(HeroConfig.HookType.PULL, {}))
 	if sfx.has("fire"):
 		_play_pooled(sfx["fire"])
 
 ## Play hook hit sound for a specific hero type.
-func play_hook_hit(hook_type: int = HeroConfig.HookType.PULL) -> void:
+func play_hook_hit(hook_type: HeroConfig.HookType = HeroConfig.HookType.PULL) -> void:
 	var sfx: Dictionary = _hero_sfx.get(hook_type, _hero_sfx.get(HeroConfig.HookType.PULL, {}))
 	if sfx.has("hit"):
 		_play_pooled(sfx["hit"])
 
 ## Play hook miss sound for a specific hero type.
-func play_hook_miss(hook_type: int = HeroConfig.HookType.PULL) -> void:
+func play_hook_miss(hook_type: HeroConfig.HookType = HeroConfig.HookType.PULL) -> void:
 	var sfx: Dictionary = _hero_sfx.get(hook_type, _hero_sfx.get(HeroConfig.HookType.PULL, {}))
 	if sfx.has("miss"):
 		_play_pooled(sfx["miss"])

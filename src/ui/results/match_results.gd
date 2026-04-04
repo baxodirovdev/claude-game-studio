@@ -164,8 +164,8 @@ func _show_mvp(winner_team: int) -> void:
 		var mvp_score: int = kills * 3 + assists * 1 - deaths * 1
 		if mvp_score > best_score:
 			best_score = mvp_score
-			var node: Node = stats.get("node")
-			best_name = node.name if node and is_instance_valid(node) else "Unknown"
+			var node := stats.get("node", null) as Node
+			best_name = node.name if node != null and is_instance_valid(node) else "Unknown"
 
 	if best_name != "":
 		mvp_label.text = "MVP: %s" % best_name

@@ -169,7 +169,8 @@ func _freeze_all_players() -> void:
 func sync_match_state(state_id: int, time_remaining: float, kills: Array) -> void:
 	current_state = state_id as State
 	match_time_remaining = time_remaining
-	team_kills = [kills[0] as int, kills[1] as int]
+	team_kills[0] = kills[0] as int
+	team_kills[1] = kills[1] as int
 	match_state_changed.emit(current_state)
 
 ## Sync countdown tick to clients.

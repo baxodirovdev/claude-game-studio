@@ -292,7 +292,7 @@ func _on_target_killed(target: Node3D, _damage_type: String) -> void:
 	)
 
 func _spawn_dummy_targets() -> void:
-	var positions := [
+	var positions: Array[Vector3] = [
 		Vector3(12, 0.8, -6),
 		Vector3(15, 0.8, 0),
 		Vector3(12, 0.8, 6),
@@ -479,8 +479,8 @@ func _create_target(pos: Vector3) -> CharacterBody3D:
 	body.add_child(health)
 
 	# Connect death
-	health.died.connect(func(victim: Node, killer: Node, dtype: String) -> void:
-		hook_system.target_killed.emit(victim, dtype)
+	health.died.connect(func(victim: Node, _killer: Node, dtype: String) -> void:
+		hook_system.target_killed.emit(victim as Node3D, dtype)
 	)
 
 	# Enemy health bar

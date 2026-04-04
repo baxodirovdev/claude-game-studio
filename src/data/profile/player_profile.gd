@@ -49,9 +49,10 @@ func load_profile() -> void:
 	matches_played = _config.get_value("stats", "matches_played", 0)
 
 	# Load hero mastery
-	for key: String in _config.get_section_keys("heroes") if _config.has_section("heroes") else []:
-		var data: Dictionary = _config.get_value("heroes", key, {})
-		hero_mastery[key] = data
+	if _config.has_section("heroes"):
+		for key: String in _config.get_section_keys("heroes"):
+			var data: Dictionary = _config.get_value("heroes", key, {})
+			hero_mastery[key] = data
 
 	_recalculate_level()
 

@@ -145,15 +145,17 @@ func _build_collision_walls() -> void:
 		[Vector3(gap_half, 1, 0), Vector3(0.5, 4, full_depth)],    # Right gap wall
 	]
 
-	for wall_info in walls:
+	for wall_info: Array in walls:
+		var wall_pos: Vector3 = wall_info[0]
+		var wall_size: Vector3 = wall_info[1]
 		var wall := StaticBody3D.new()
 		var shape := CollisionShape3D.new()
 		var box := BoxShape3D.new()
-		box.size = wall_info[1]
+		box.size = wall_size
 		shape.shape = box
 		wall.add_child(shape)
 		_walls_node.add_child(wall)
-		wall.global_position = wall_info[0]
+		wall.global_position = wall_pos
 
 func _build_hazard_markers() -> void:
 	_hazards_node = Node3D.new()

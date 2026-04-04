@@ -152,7 +152,8 @@ func _add_feed_entry(killer: Node, victim: Node, damage_type: String) -> void:
 @rpc("authority", "call_local", "reliable")
 func sync_kill(victim_name: String, killer_name: String, damage_type: String,
 		killer_team: int, new_team_kills: Array) -> void:
-	team_kills = [new_team_kills[0] as int, new_team_kills[1] as int]
+	team_kills[0] = new_team_kills[0] as int
+	team_kills[1] = new_team_kills[1] as int
 	kill_occurred.emit(killer_team, team_kills)
 	# Add to local kill feed
 	var entry: Dictionary = {

@@ -48,9 +48,9 @@ func get_selected_arena() -> ArenaData:
 		# Random — pick one
 		var choices: Array[ArenaData] = []
 		for i in range(1, _arenas.size()):
-			choices.append(_arenas[i]["data"])
+			choices.append(_arenas[i]["data"] as ArenaData)
 		return choices[randi() % choices.size()]
-	return _arenas[_selected_index]["data"]
+	return _arenas[_selected_index]["data"] as ArenaData
 
 func _cycle_arena() -> void:
 	_selected_index = (_selected_index + 1) % _arenas.size()

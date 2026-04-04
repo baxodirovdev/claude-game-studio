@@ -159,7 +159,7 @@ func _on_player_disconnected(peer_id: int) -> void:
 
 			# If only one team remains, they win by forfeit
 			if teams_alive.size() == 1:
-				var winner_team: int = teams_alive.keys()[0]
+				var winner_team: int = teams_alive.keys()[0] as int
 				match_state._end_match(winner_team, "forfeit")
 
 	opponent_disconnected_display.emit("Opponent Disconnected")
