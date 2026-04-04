@@ -130,6 +130,12 @@ custom_minimum_size = Vector2(0, 40)
 text = "PLAY AGAIN"
 theme_override_font_sizes/font_size = 18
 
+[node name="MenuButton" type="Button" parent="MatchResults/Panel/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 36)
+text = "RETURN TO MENU"
+theme_override_font_sizes/font_size = 14
+
 [node name="VFXSystem" type="Node3D" parent="."]
 script = ExtResource("19")
 

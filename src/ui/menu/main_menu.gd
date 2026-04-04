@@ -37,6 +37,12 @@ func _ready() -> void:
 	if settings_panel:
 		settings_panel.visible = false
 
+	# Wire NetworkManager autoload into LobbyScreen
+	var lobby := get_node_or_null("LobbyScreen") as LobbyScreen
+	if lobby:
+		lobby.network_manager = get_node_or_null("/root/NetworkManager") as NetworkManager
+		lobby.visible = false
+
 	play_solo_button.grab_focus()
 
 func _on_play_solo() -> void:

@@ -153,6 +153,7 @@ func _ready() -> void:
 	match_results.match_config = match_config
 	match_results.player_profile = player_profile
 	match_results.play_again_requested.connect(_on_play_again)
+	match_results.return_to_menu_requested.connect(_on_return_to_menu)
 
 func _on_arena_ready() -> void:
 	# Place player at middle Team A spawn
@@ -400,6 +401,13 @@ func _on_match_ended(winner_team: int, _reason: String) -> void:
 		hud.result_label.visible = false
 		match_results.show_results(winner_team, player.team_id)
 	)
+
+func _on_return_to_menu() -> void:
+	var flow := get_node_or_null("/root/SceneFlowManager") as SceneFlowManager
+	if flow:
+		flow.go_to_main_menu()
+	else:
+		get_tree().quit()
 
 func _on_play_again() -> void:
 	# Reset gold and economy

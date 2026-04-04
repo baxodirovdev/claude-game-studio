@@ -7,6 +7,7 @@ class_name MatchResults
 extends CanvasLayer
 
 signal play_again_requested
+signal return_to_menu_requested
 
 ## References set by Main.
 var score_system: ScoreSystem
@@ -22,12 +23,19 @@ var player_profile: PlayerProfile
 @onready var mvp_label: Label = $Panel/VBox/MVPLabel
 @onready var play_again_button: Button = $Panel/VBox/PlayAgainButton
 
+@onready var menu_button: Button = $Panel/VBox/MenuButton
+
 func _ready() -> void:
 	visible = false
 	play_again_button.pressed.connect(func() -> void:
 		visible = false
 		play_again_requested.emit()
 	)
+	if menu_button:
+		menu_button.pressed.connect(func() -> void:
+			visible = false
+			return_to_menu_requested.emit()
+		)
 
 ## Show results for the completed match.
 func show_results(winner_team: int, player_team: int) -> void:

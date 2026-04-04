@@ -13,8 +13,8 @@ signal transition_finished
 const FADE_DURATION: float = 0.3
 
 ## Scene paths — all navigation flows through these.
-const SCENE_MAIN_MENU := "res://scenes/main_menu.tscn"
-const SCENE_GAME := "res://scenes/main.tscn"
+const SCENE_MAIN_MENU := "res://ui/menu/main_menu.tscn"
+const SCENE_GAME := "res://main.tscn"
 
 var _is_transitioning: bool = false
 var _fade_rect: ColorRect

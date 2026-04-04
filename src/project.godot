@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Hook Wars"
-run/main_scene="res://main.tscn"
+run/main_scene="res://ui/menu/main_menu.tscn"
 config/features=PackedStringArray("4.6")
 
 [display]
@@ -28,6 +28,11 @@ window/handheld/orientation=1
 
 pointing/emulate_touch_from_mouse=true
 pointing/emulate_mouse_from_touch=true
+
+[autoload]
+
+SceneFlowManager="*res://core/scene_flow/scene_flow_manager.gd"
+NetworkManager="*res://core/network/network_manager.gd"
 
 [rendering]
 
