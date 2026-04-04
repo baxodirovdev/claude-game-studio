@@ -36,7 +36,7 @@ func _create_world_environment() -> void:
 	env.ambient_light_energy = 0.4
 
 	# --- Tonemap ---
-	env.tonemap_mode = Environment.TONE_MAP_FILMIC
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.tonemap_white = 6.0
 
 	# --- Bloom (glow) --- makes lights and emissive materials pop
