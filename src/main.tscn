@@ -1,4 +1,4 @@
-[gd_scene load_steps=25 format=3]
+[gd_scene load_steps=26 format=3]
 
 [ext_resource type="Script" path="res://main.gd" id="1"]
 [ext_resource type="PackedScene" path="res://core/input/input_manager.tscn" id="2"]
@@ -22,6 +22,7 @@
 [ext_resource type="Script" path="res://gameplay/economy/gold_system.gd" id="21"]
 [ext_resource type="Script" path="res://ui/shop/item_shop.gd" id="22"]
 [ext_resource type="Script" path="res://data/profile/player_profile.gd" id="23"]
+[ext_resource type="Script" path="res://core/environment/game_environment.gd" id="24"]
 
 [sub_resource type="CapsuleShape3D" id="1"]
 radius = 0.4
@@ -69,7 +70,14 @@ script = ExtResource("5")
 
 [node name="DirectionalLight" type="DirectionalLight3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.5, 0.866, 0, -0.866, 0.5, 0, 20, 0)
+light_color = Color(1.0, 0.95, 0.85, 1)
+light_energy = 1.2
 shadow_enabled = true
+shadow_bias = 0.05
+directional_shadow_max_distance = 60.0
+
+[node name="GameEnvironment" type="Node3D" parent="."]
+script = ExtResource("24")
 
 [node name="InputManager" parent="." instance=ExtResource("2")]
 

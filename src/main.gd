@@ -50,11 +50,8 @@ func _ready() -> void:
 	player_health.max_health = hero_config.max_health
 	player_health.current_health = hero_config.max_health
 
-	# Apply hero color
-	var player_mesh: MeshInstance3D = player.get_node("MeshInstance3D")
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = hero_config.hero_color
-	player_mesh.material_override = mat
+	# Build hero 3D model
+	HeroModelBuilder.build_model(player, hero_config)
 
 	# Wire hook system and apply hero config
 	hook_system.player = player
@@ -199,11 +196,8 @@ func _apply_hero_config(config: HeroConfig) -> void:
 	health.max_health = config.max_health
 	health.current_health = config.max_health
 
-	# Apply hero color
-	var player_mesh: MeshInstance3D = player.get_node("MeshInstance3D")
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = config.hero_color
-	player_mesh.material_override = mat
+	# Build hero 3D model
+	HeroModelBuilder.build_model(player, config)
 
 	# Apply to hook system
 	hook_system.hook_speed = config.hook_speed
@@ -469,16 +463,11 @@ func _create_target(pos: Vector3) -> CharacterBody3D:
 	col.shape = capsule
 	body.add_child(col)
 
-	# Visual
-	var mesh := MeshInstance3D.new()
-	var capsule_mesh := CapsuleMesh.new()
-	capsule_mesh.radius = 0.4
-	capsule_mesh.height = 1.6
-	mesh.mesh = capsule_mesh
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color.ORANGE
-	mesh.material_override = mat
-	body.add_child(mesh)
+	# Visual — build enemy model using hero model builder with enemy color
+	var enemy_config := HeroConfig.new()
+	enemy_config.hook_type = HeroConfig.HookType.PULL
+	enemy_config.hero_color = Color(0.9, 0.35, 0.2)
+	HeroModelBuilder.build_model(body, enemy_config)
 
 	# Health component (so hooks can damage them)
 	var health := HealthComponent.new()
