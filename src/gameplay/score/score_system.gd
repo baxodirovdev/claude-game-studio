@@ -84,7 +84,7 @@ func record_kill(victim: Node, killer: Node, damage_type: String) -> void:
 func _get_assist_candidate(victim: Node, killer: Node) -> Node:
 	if victim == null:
 		return null
-	var health: HealthComponent = victim.get_node_or_null("HealthComponent")
+	var health := victim.get_node_or_null("HealthComponent") as HealthComponent
 	if health == null:
 		return null
 	return health.get_assist_candidate(killer)

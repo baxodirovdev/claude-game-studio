@@ -50,7 +50,7 @@ func _on_play_solo() -> void:
 	# Go directly to game scene (solo mode with hero select)
 	var flow := _get_scene_flow()
 	if flow:
-		flow.go_to_game()
+		flow.call("go_to_game")
 
 func _on_play_multi() -> void:
 	# Show lobby screen overlay
@@ -65,7 +65,7 @@ func _on_settings() -> void:
 func _on_quit() -> void:
 	var flow := _get_scene_flow()
 	if flow:
-		flow.quit_game()
+		flow.call("quit_game")
 	else:
 		get_tree().quit()
 

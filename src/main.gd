@@ -403,9 +403,9 @@ func _on_match_ended(winner_team: int, _reason: String) -> void:
 	)
 
 func _on_return_to_menu() -> void:
-	var flow := get_node_or_null("/root/SceneFlowManager")
+	var flow: Node = get_node_or_null("/root/SceneFlowManager")
 	if flow:
-		flow.go_to_main_menu()
+		flow.call("go_to_main_menu")
 	else:
 		get_tree().quit()
 
@@ -451,7 +451,7 @@ func _on_play_again() -> void:
 			var col := target.get_node_or_null("CollisionShape3D")
 			if col:
 				col.disabled = false
-			var target_health: HealthComponent = target.get_node_or_null("HealthComponent")
+			var target_health := target.get_node_or_null("HealthComponent") as HealthComponent
 			if target_health:
 				target_health.restore_full()
 

@@ -501,7 +501,7 @@ func notify_fire(facing: float) -> void:
 ## Notify all peers of a hook hit (broadcast by server).
 @rpc("authority", "call_local", "reliable")
 func notify_hit(target_path: String) -> void:
-	var target := get_node_or_null(target_path)
+	var target := get_node_or_null(target_path) as Node3D
 	if target:
 		hook_hit.emit(target)
 
