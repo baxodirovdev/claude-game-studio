@@ -30,12 +30,12 @@ func _ready() -> void:
 		add_child(player)
 		_sfx_pool.append(player)
 
-	# Generate generic sounds
-	_sfx_kill = _generate_tone(1200.0, 0.25, -3.0)
-	_sfx_death = _generate_tone(100.0, 0.4, -6.0)
-	_sfx_countdown_beep = _generate_tone(600.0, 0.1, -6.0)
-	_sfx_match_start = _generate_tone(800.0, 0.3, -3.0)
-	_sfx_respawn = _generate_tone(500.0, 0.2, -6.0)
+	# Generate polished sounds (layered waveforms)
+	_sfx_kill = _generate_kill_chime()
+	_sfx_death = _generate_death_sound()
+	_sfx_countdown_beep = _generate_countdown_beep()
+	_sfx_match_start = _generate_match_horn()
+	_sfx_respawn = _generate_respawn_sound()
 
 	# Generate per-hero sounds
 	# PULL (Vex): Metallic chain rattle — mid-frequency, sharp attack
@@ -313,5 +313,128 @@ func _generate_tone(frequency: float, duration: float, volume_db: float) -> Audi
 	var wav := AudioStreamWAV.new()
 	wav.format = AudioStreamWAV.FORMAT_16_BITS
 	wav.mix_rate = sample_rate
+	wav.data = data
+	return wav
+
+## --- Polished Sound Generators ---
+
+func _write_sample(data: PackedByteArray, index: int, value: float) -> void:
+	var si := clampi(int(value), -32768, 32767)
+	data[index * 2] = si & 0xFF
+	data[index * 2 + 1] = (si >> 8) & 0xFF
+
+## Kill chime: two-note ascending chord (satisfying ding-ding).
+func _generate_kill_chime() -> AudioStreamWAV:
+	var sr := 22050
+	var dur := 0.35
+	var ns := int(sr * dur)
+	var data := PackedByteArray()
+	data.resize(ns * 2)
+	var amp := 32767.0 * db_to_linear(-3.0)
+	for i in range(ns):
+		var t := float(i) / sr
+		var env1 := maxf(0.0, 1.0 - t / 0.3) * (1.0 - exp(-t * 80.0))
+		var n1 := sin(TAU * 1047.0 * t) * env1
+		var t2 := maxf(0.0, t - 0.08)
+		var env2 := maxf(0.0, 1.0 - t2 / 0.25) * (1.0 - exp(-t2 * 80.0)) if t > 0.08 else 0.0
+		var n2 := sin(TAU * 1319.0 * t) * env2
+		var shimmer := sin(TAU * 2094.0 * t) * env1 * 0.15
+		_write_sample(data, i, (n1 * 0.5 + n2 * 0.4 + shimmer) * amp)
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = sr
+	wav.data = data
+	return wav
+
+## Death sound: low rumble with descending pitch.
+func _generate_death_sound() -> AudioStreamWAV:
+	var sr := 22050
+	var dur := 0.5
+	var ns := int(sr * dur)
+	var data := PackedByteArray()
+	data.resize(ns * 2)
+	var amp := 32767.0 * db_to_linear(-4.0)
+	var phase := 0.0
+	for i in range(ns):
+		var t := float(i) / sr
+		var p := t / dur
+		var freq := lerpf(150.0, 40.0, p)
+		var env := maxf(0.0, 1.0 - p * 0.8) * (1.0 - exp(-t * 30.0))
+		phase += TAU * freq / sr
+		var s := (sin(phase) + sin(phase * 0.5) * 0.4 + randf_range(-0.15, 0.15) * env) * amp * env
+		_write_sample(data, i, s)
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = sr
+	wav.data = data
+	return wav
+
+## Countdown beep: sharp click with high-freq body.
+func _generate_countdown_beep() -> AudioStreamWAV:
+	var sr := 22050
+	var dur := 0.12
+	var ns := int(sr * dur)
+	var data := PackedByteArray()
+	data.resize(ns * 2)
+	var amp := 32767.0 * db_to_linear(-5.0)
+	for i in range(ns):
+		var t := float(i) / sr
+		var env := exp(-t * 40.0)
+		var s := (sin(TAU * 800.0 * t) + sin(TAU * 1600.0 * t) * 0.3) * amp * env
+		_write_sample(data, i, s)
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = sr
+	wav.data = data
+	return wav
+
+## Match start horn: rising brass-like swell.
+func _generate_match_horn() -> AudioStreamWAV:
+	var sr := 22050
+	var dur := 0.5
+	var ns := int(sr * dur)
+	var data := PackedByteArray()
+	data.resize(ns * 2)
+	var amp := 32767.0 * db_to_linear(-2.0)
+	var phase := 0.0
+	for i in range(ns):
+		var t := float(i) / sr
+		var p := t / dur
+		var freq := lerpf(400.0, 600.0, minf(p * 2.0, 1.0))
+		var attack := minf(t / 0.08, 1.0)
+		var release := maxf(0.0, 1.0 - (t - 0.35) / 0.15) if t > 0.35 else 1.0
+		var env := attack * release
+		phase += TAU * freq / sr
+		var s := (sin(phase) + sin(phase * 2.0) * 0.35 + sin(phase * 3.0) * 0.15) * amp * env / 1.5
+		_write_sample(data, i, s)
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = sr
+	wav.data = data
+	return wav
+
+## Respawn sound: ascending sparkle arpeggio.
+func _generate_respawn_sound() -> AudioStreamWAV:
+	var sr := 22050
+	var dur := 0.4
+	var ns := int(sr * dur)
+	var data := PackedByteArray()
+	data.resize(ns * 2)
+	var amp := 32767.0 * db_to_linear(-5.0)
+	for i in range(ns):
+		var t := float(i) / sr
+		var p := t / dur
+		var nf := 500.0
+		if t >= 0.2:
+			nf = 750.0
+		elif t >= 0.1:
+			nf = 630.0
+		var note_t := fmod(t, 0.13)
+		var env := exp(-note_t * 15.0) * maxf(0.0, 1.0 - p * 0.5)
+		var s := (sin(TAU * nf * t) + sin(TAU * nf * 2.0 * t) * 0.2) * amp * env
+		_write_sample(data, i, s)
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = sr
 	wav.data = data
 	return wav
