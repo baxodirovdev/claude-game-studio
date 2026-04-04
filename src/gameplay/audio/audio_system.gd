@@ -56,6 +56,12 @@ func _ready() -> void:
 		"hit": _generate_tone(600.0, 0.15, -2.0),  # Meaty impact thud
 		"miss": _generate_buzz(120.0, 0.3, -8.0),  # Fading spin
 	}
+	# CHARGE (Coil): Spring tension — rising pitch, snap on release
+	_hero_sfx[HeroConfig.HookType.CHARGE] = {
+		"fire": _generate_sweep(200.0, 800.0, 0.3, -5.0),  # Rising tension charge
+		"hit": _generate_tone(1000.0, 0.12, -2.0),  # Powerful snap impact
+		"miss": _generate_sweep(600.0, 100.0, 0.3, -8.0),  # Spring uncoil fizzle
+	}
 	# BEAM (Flux): Electric hum — sustained, crackling
 	_hero_sfx[HeroConfig.HookType.BEAM] = {
 		"fire": _generate_sweep(300.0, 600.0, 0.2, -5.0),  # Charging up

@@ -1,7 +1,8 @@
 ## Network Manager — manages multiplayer peer lifecycle, connections, and session info.
 ##
-## Autoload singleton. Handles ENet peer creation for host/client, tracks connected
-## players, and emits signals for lobby and game systems. Implements ADR-001.
+## Autoload singleton. Handles ENet (LAN) and WebSocket (online) peer creation.
+## Tracks connected players and emits signals for lobby and game systems.
+## Implements ADR-001.
 class_name NetworkManager
 extends Node
 
@@ -10,11 +11,21 @@ signal player_left(peer_id: int)
 signal connection_succeeded
 signal connection_failed
 signal server_disconnected
+signal room_code_received(code: String)
+
+enum Mode { OFFLINE, LAN, ONLINE }
 
 ## Default port for LAN games.
 const DEFAULT_PORT: int = 9999
+## Default relay server port.
+const RELAY_PORT: int = 9998
 ## Maximum players (2 for now — expandable later).
 const MAX_PLAYERS: int = 2
+
+## Current connection mode.
+var mode: Mode = Mode.OFFLINE
+## Room code for online mode.
+var room_code: String = ""
 
 ## Local peer ID (1 = server, >1 = client).
 var local_peer_id: int = 0
@@ -33,7 +44,7 @@ func _ready() -> void:
 	multiplayer.connection_failed.connect(_on_connection_failed)
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
 
-## Host a game on the given port. Returns OK or error.
+## Host a LAN game on the given port. Returns OK or error.
 func host_game(port: int = DEFAULT_PORT) -> Error:
 	var peer := ENetMultiplayerPeer.new()
 	var err := peer.create_server(port, MAX_PLAYERS)
@@ -42,10 +53,11 @@ func host_game(port: int = DEFAULT_PORT) -> Error:
 	multiplayer.multiplayer_peer = peer
 	is_hosting = true
 	local_peer_id = 1
+	mode = Mode.LAN
 	player_info[1] = {"hero_config_path": "", "team_id": 0, "ready": false}
 	return OK
 
-## Join a game at the given address and port. Connection result comes via signals.
+## Join a LAN game at the given address and port.
 func join_game(address: String, port: int = DEFAULT_PORT) -> Error:
 	var peer := ENetMultiplayerPeer.new()
 	var err := peer.create_client(address, port)
@@ -53,6 +65,34 @@ func join_game(address: String, port: int = DEFAULT_PORT) -> Error:
 		return err
 	multiplayer.multiplayer_peer = peer
 	is_hosting = false
+	mode = Mode.LAN
+	return OK
+
+## Host an online game via WebSocket relay. Connects to relay and creates a room.
+func host_online(relay_address: String, relay_port: int = RELAY_PORT) -> Error:
+	var peer := WebSocketMultiplayerPeer.new()
+	var url := "ws://%s:%d" % [relay_address, relay_port]
+	var err := peer.create_client(url)
+	if err != OK:
+		return err
+	multiplayer.multiplayer_peer = peer
+	is_hosting = true
+	mode = Mode.ONLINE
+	# Room creation happens after connection succeeds
+	return OK
+
+## Join an online game via WebSocket relay with a room code.
+func join_online(relay_address: String, code: String, relay_port: int = RELAY_PORT) -> Error:
+	var peer := WebSocketMultiplayerPeer.new()
+	var url := "ws://%s:%d" % [relay_address, relay_port]
+	var err := peer.create_client(url)
+	if err != OK:
+		return err
+	multiplayer.multiplayer_peer = peer
+	is_hosting = false
+	mode = Mode.ONLINE
+	room_code = code
+	# Join request happens after connection succeeds
 	return OK
 
 ## Disconnect and reset to offline state.
@@ -60,6 +100,8 @@ func disconnect_game() -> void:
 	multiplayer.multiplayer_peer = null
 	is_hosting = false
 	local_peer_id = 0
+	mode = Mode.OFFLINE
+	room_code = ""
 	connected_peers.clear()
 	player_info.clear()
 

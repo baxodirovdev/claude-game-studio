@@ -225,6 +225,8 @@ func _hero_path_to_name(path: String) -> String:
 			return "Maw"
 		"res://data/heroes/flux.tres":
 			return "Flux"
+		"res://data/heroes/coil.tres":
+			return "Coil"
 		_:
 			return "Vex"
 

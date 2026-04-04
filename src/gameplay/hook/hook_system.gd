@@ -36,6 +36,11 @@ var _beam_active: bool = false
 var _beam_target: Node3D = null
 var _beam_elapsed: float = 0.0
 
+# Charge state (Coil)
+var _charging: bool = false
+var _charge_time: float = 0.0
+var _charge_facing: float = 0.0
+
 # Stats
 var hooks_fired: int = 0
 var hooks_hit: int = 0
@@ -51,6 +56,13 @@ func fire(facing_angle: float) -> bool:
 	# Beam hook type: scan and lock-on instead of projectile
 	if hero_config and hero_config.hook_type == HeroConfig.HookType.BEAM:
 		return _fire_beam(facing_angle)
+
+	# Charge hook type: start charging on first fire, release fires projectile
+	if hero_config and hero_config.hook_type == HeroConfig.HookType.CHARGE:
+		if not _charging:
+			return _start_charge(facing_angle)
+		# If already charging, this is the release
+		return _release_charge()
 
 	hooks_fired += 1
 
@@ -181,6 +193,10 @@ func _start_pull_monitor() -> void:
 	set_physics_process(true)
 
 func _physics_process(delta: float) -> void:
+	if _charging:
+		_process_charge(delta)
+		return
+
 	if _beam_active:
 		_process_beam(delta)
 		return
@@ -258,6 +274,91 @@ func _find_health(node: Node) -> HealthComponent:
 
 func _ready() -> void:
 	set_physics_process(false)  # Only enable during pull monitoring
+
+## --- Charge Hook (Coil) ---
+
+func _start_charge(facing_angle: float) -> bool:
+	_charging = true
+	_charge_time = 0.0
+	_charge_facing = facing_angle
+	player.lock()
+	input_manager.lock_joystick()
+	hook_fired.emit()
+	set_physics_process(true)
+	return true
+
+func _release_charge() -> bool:
+	var charge_progress := clampf(
+		(_charge_time - hero_config.charge_min_time) /
+		(hero_config.charge_max_time - hero_config.charge_min_time),
+		0.0, 1.0
+	)
+
+	_charging = false
+	set_physics_process(false)
+
+	# If released before minimum charge, treat as a miss
+	if _charge_time < hero_config.charge_min_time:
+		hooks_fired += 1
+		hooks_missed += 1
+		hook_missed.emit()
+		player.unlock()
+		input_manager.unlock_joystick()
+		input_manager.notify_hook_returned()
+		hook_returned.emit()
+		return true
+
+	# Fire a powered-up projectile
+	hooks_fired += 1
+	var charged_damage := hook_damage * lerpf(1.0, hero_config.charge_damage_mult, charge_progress)
+	var charged_range := hook_range * lerpf(1.0, hero_config.charge_range_mult, charge_progress)
+
+	# Store originals and apply charge bonuses temporarily
+	var orig_damage := hook_damage
+	var orig_range := hook_range
+	hook_damage = charged_damage
+	hook_range = charged_range
+
+	# Fire using standard projectile logic (reuse the rest of fire())
+	var face_dir := Vector2(cos(_charge_facing), -sin(_charge_facing))
+	var world_dir := Vector3(face_dir.x, 0, face_dir.y).normalized()
+
+	_active_projectile = HookProjectile.new()
+	_active_projectile.direction = world_dir
+	_active_projectile.speed = hook_speed * lerpf(1.0, 1.5, charge_progress)
+	_active_projectile.return_speed = hook_return_speed
+	_active_projectile.max_range = charged_range
+	_active_projectile.hitbox_radius = hook_hitbox_radius
+	_active_projectile.owner_node = player
+	_active_projectile.target_group = "hookable"
+	if hero_config:
+		_active_projectile.projectile_color = hero_config.hero_color
+	if arena:
+		_active_projectile.arena_bounds = arena.get_arena_bounds()
+
+	_active_projectile.hit_target.connect(_on_hook_hit_target)
+	_active_projectile.hit_wall.connect(_on_hook_missed)
+	_active_projectile.reached_max_range.connect(_on_hook_missed)
+	_active_projectile.returned_to_owner.connect(func() -> void:
+		# Restore original stats after shot
+		hook_damage = orig_damage
+		hook_range = orig_range
+		_on_hook_returned()
+	)
+
+	get_tree().current_scene.add_child(_active_projectile)
+	_active_projectile.global_position = player.global_position + Vector3(0, 0.5, 0)
+
+	input_manager.notify_hook_fired()
+	return true
+
+func _process_charge(delta: float) -> void:
+	if not _charging:
+		return
+	_charge_time += delta
+	# Auto-release at max charge
+	if _charge_time >= hero_config.charge_max_time:
+		_release_charge()
 
 ## --- Beam Hook (Flux) ---
 

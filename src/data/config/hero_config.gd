@@ -6,7 +6,7 @@
 class_name HeroConfig
 extends Resource
 
-enum HookType { PULL, GRAPPLE, BOOMERANG, BEAM }
+enum HookType { PULL, GRAPPLE, BOOMERANG, BEAM, CHARGE }
 
 @export_group("Identity")
 ## Unique hero identifier.
@@ -51,6 +51,16 @@ enum HookType { PULL, GRAPPLE, BOOMERANG, BEAM }
 @export var boomerang_return_damage: float = 30.0
 ## Hitbox radius multiplier on return pass (wider = more forgiving).
 @export var boomerang_return_hitbox_mult: float = 1.0
+
+@export_group("Charge (Coil)")
+## Minimum charge time in seconds. CHARGE type only.
+@export var charge_min_time: float = 0.3
+## Maximum charge time (caps bonuses). CHARGE type only.
+@export var charge_max_time: float = 2.0
+## Damage multiplier at full charge (applied to hook_damage).
+@export var charge_damage_mult: float = 2.5
+## Range multiplier at full charge (applied to hook_range).
+@export var charge_range_mult: float = 2.0
 
 @export_group("Beam (Flux)")
 ## Beam lock-on duration in seconds. BEAM type only.

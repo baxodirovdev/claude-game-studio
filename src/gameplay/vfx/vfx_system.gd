@@ -18,6 +18,8 @@ func attach_hero_hook_trail(projectile: Node3D, hero_config: HeroConfig) -> GPUP
 			return _attach_grapple_trail(projectile, hero_config.hero_color)
 		HeroConfig.HookType.BEAM:
 			return _attach_beam_trail(projectile, hero_config.hero_color)
+		HeroConfig.HookType.CHARGE:
+			return _attach_charge_trail(projectile, hero_config.hero_color)
 		HeroConfig.HookType.BOOMERANG:
 			return _attach_boomerang_trail(projectile, hero_config.hero_color)
 		_:
@@ -107,6 +109,36 @@ func _attach_boomerang_trail(projectile: Node3D, color: Color) -> GPUParticles3D
 	projectile.add_child(particles)
 	return particles
 
+## Coil (CHARGE): Yellow coiling energy — spiraling, intense at full charge.
+func _attach_charge_trail(projectile: Node3D, color: Color) -> GPUParticles3D:
+	var particles := GPUParticles3D.new()
+	particles.amount = 30
+	particles.lifetime = 0.35
+	particles.emitting = true
+	particles.one_shot = false
+
+	var mat := ParticleProcessMaterial.new()
+	mat.direction = Vector3(0, 0, 0)
+	mat.spread = 15.0
+	mat.initial_velocity_min = 2.0
+	mat.initial_velocity_max = 5.0
+	mat.gravity = Vector3.ZERO
+	mat.scale_min = 0.03
+	mat.scale_max = 0.1
+	mat.color = Color(color.r * 1.2, color.g * 1.2, 0.3)
+	mat.orbit_velocity_min = 1.0
+	mat.orbit_velocity_max = 3.0
+
+	particles.process_material = mat
+
+	var draw_pass := SphereMesh.new()
+	draw_pass.radius = 0.04
+	draw_pass.height = 0.08
+	particles.draw_pass_1 = draw_pass
+
+	projectile.add_child(particles)
+	return particles
+
 ## Flux (BEAM): Purple magnetic field — swirling, electric.
 func _attach_beam_trail(projectile: Node3D, color: Color) -> GPUParticles3D:
 	var particles := GPUParticles3D.new()
@@ -155,6 +187,9 @@ func spawn_hero_hit_flash(position: Vector3, hero_config: HeroConfig) -> void:
 		HeroConfig.HookType.BEAM:
 			# Purple magnetic pulse — concentric rings
 			spawn_hit_flash(position, hero_config.hero_color)
+		HeroConfig.HookType.CHARGE:
+			# Yellow energy burst — bigger flash for charged shots
+			_spawn_explosion_flash(position, hero_config.hero_color)
 		_:
 			spawn_hit_flash(position, hero_config.hero_color)
 
