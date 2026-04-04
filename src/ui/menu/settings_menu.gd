@@ -100,7 +100,7 @@ func _apply_audio() -> void:
 		AudioServer.set_bus_volume_db(sfx_idx, sfx_db)
 
 func _load_settings() -> void:
-	var err := _config.load(SETTINGS_PATH)
+	var err: Error = _config.load(SETTINGS_PATH)
 	if err != OK:
 		# First run — use defaults
 		return

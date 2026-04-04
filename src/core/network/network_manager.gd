@@ -47,7 +47,7 @@ func _ready() -> void:
 ## Host a LAN game on the given port. Returns OK or error.
 func host_game(port: int = DEFAULT_PORT) -> Error:
 	var peer := ENetMultiplayerPeer.new()
-	var err := peer.create_server(port, MAX_PLAYERS)
+	var err: Error = peer.create_server(port, MAX_PLAYERS)
 	if err != OK:
 		return err
 	multiplayer.multiplayer_peer = peer
@@ -60,7 +60,7 @@ func host_game(port: int = DEFAULT_PORT) -> Error:
 ## Join a LAN game at the given address and port.
 func join_game(address: String, port: int = DEFAULT_PORT) -> Error:
 	var peer := ENetMultiplayerPeer.new()
-	var err := peer.create_client(address, port)
+	var err: Error = peer.create_client(address, port)
 	if err != OK:
 		return err
 	multiplayer.multiplayer_peer = peer
@@ -72,7 +72,7 @@ func join_game(address: String, port: int = DEFAULT_PORT) -> Error:
 func host_online(relay_address: String, relay_port: int = RELAY_PORT) -> Error:
 	var peer := WebSocketMultiplayerPeer.new()
 	var url := "ws://%s:%d" % [relay_address, relay_port]
-	var err := peer.create_client(url)
+	var err: Error = peer.create_client(url)
 	if err != OK:
 		return err
 	multiplayer.multiplayer_peer = peer
@@ -85,7 +85,7 @@ func host_online(relay_address: String, relay_port: int = RELAY_PORT) -> Error:
 func join_online(relay_address: String, code: String, relay_port: int = RELAY_PORT) -> Error:
 	var peer := WebSocketMultiplayerPeer.new()
 	var url := "ws://%s:%d" % [relay_address, relay_port]
-	var err := peer.create_client(url)
+	var err: Error = peer.create_client(url)
 	if err != OK:
 		return err
 	multiplayer.multiplayer_peer = peer

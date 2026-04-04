@@ -66,7 +66,7 @@ func _on_host_pressed() -> void:
 		status_label.text = "Network manager not available"
 		return
 
-	var err := network_manager.host_game()
+	var err: Error = network_manager.host_game()
 	if err != OK:
 		status_label.text = "Failed to host: error %d" % err
 		return
@@ -92,7 +92,7 @@ func _on_join_pressed() -> void:
 		return
 
 	status_label.text = "Connecting to %s..." % address
-	var err := network_manager.join_game(address)
+	var err: Error = network_manager.join_game(address)
 	if err != OK:
 		status_label.text = "Failed to connect: error %d" % err
 		return

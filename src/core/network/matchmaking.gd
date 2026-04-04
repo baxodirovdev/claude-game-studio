@@ -35,7 +35,7 @@ func find_match(timeout: float = 30.0) -> void:
 
 	_peer = WebSocketMultiplayerPeer.new()
 	var url := "ws://%s:%d" % [relay_address, relay_port]
-	var err := _peer.create_client(url)
+	var err: Error = _peer.create_client(url)
 	if err != OK:
 		_fail("Failed to connect to matchmaking server")
 		return

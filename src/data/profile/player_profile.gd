@@ -36,7 +36,7 @@ func _ready() -> void:
 
 ## Load profile from disk.
 func load_profile() -> void:
-	var err := _config.load(PROFILE_PATH)
+	var err: Error = _config.load(PROFILE_PATH)
 	if err != OK:
 		# First time — defaults are fine
 		return
