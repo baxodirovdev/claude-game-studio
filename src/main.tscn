@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3]
+[gd_scene load_steps=25 format=3]
 
 [ext_resource type="Script" path="res://main.gd" id="1"]
 [ext_resource type="PackedScene" path="res://core/input/input_manager.tscn" id="2"]
@@ -16,6 +16,12 @@
 [ext_resource type="Script" path="res://gameplay/score/score_system.gd" id="15"]
 [ext_resource type="Script" path="res://gameplay/hero/hero_level_system.gd" id="16"]
 [ext_resource type="PackedScene" path="res://ui/hero_select/hero_select.tscn" id="17"]
+[ext_resource type="Script" path="res://ui/results/match_results.gd" id="18"]
+[ext_resource type="Script" path="res://gameplay/vfx/vfx_system.gd" id="19"]
+[ext_resource type="Script" path="res://gameplay/audio/audio_system.gd" id="20"]
+[ext_resource type="Script" path="res://gameplay/economy/gold_system.gd" id="21"]
+[ext_resource type="Script" path="res://ui/shop/item_shop.gd" id="22"]
+[ext_resource type="Script" path="res://data/profile/player_profile.gd" id="23"]
 
 [sub_resource type="CapsuleShape3D" id="1"]
 radius = 0.4
@@ -85,3 +91,57 @@ script = ExtResource("16")
 [node name="GameHUD" parent="." instance=ExtResource("13")]
 
 [node name="HeroSelect" parent="." instance=ExtResource("17")]
+
+[node name="MatchResults" type="CanvasLayer" parent="."]
+layer = 30
+script = ExtResource("18")
+
+[node name="Panel" type="PanelContainer" parent="MatchResults"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -250.0
+offset_right = 200.0
+offset_bottom = 250.0
+
+[node name="VBox" type="VBoxContainer" parent="MatchResults/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TitleLabel" type="Label" parent="MatchResults/Panel/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 36
+
+[node name="StatsContainer" type="VBoxContainer" parent="MatchResults/Panel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="MVPLabel" type="Label" parent="MatchResults/Panel/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+
+[node name="PlayAgainButton" type="Button" parent="MatchResults/Panel/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 40)
+text = "PLAY AGAIN"
+theme_override_font_sizes/font_size = 18
+
+[node name="VFXSystem" type="Node3D" parent="."]
+script = ExtResource("19")
+
+[node name="AudioSystem" type="Node" parent="."]
+script = ExtResource("20")
+
+[node name="GoldSystem" type="Node" parent="."]
+script = ExtResource("21")
+
+[node name="ItemShop" type="CanvasLayer" parent="."]
+layer = 25
+script = ExtResource("22")
+
+[node name="PlayerProfile" type="Node" parent="."]
+script = ExtResource("23")
