@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/config/item_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+item_id = "iron_plating"
+display_name = "Iron Plating"
+description = "+20 max health"
+category = 1
+icon_color = Color(0.4, 0.6, 0.9, 1)
+cost = 200
+health_bonus = 20.0

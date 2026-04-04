@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="EconomyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/config/economy_config.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+kill_gold = 100
+assist_gold = 50
+hit_gold = 15
+passive_gold = 10
+passive_interval = 15.0
+first_blood_bonus = 50
+max_items = 3

@@ -21,6 +21,8 @@ extends Node3D
 @onready var match_results: MatchResults = $MatchResults
 @onready var vfx_system: VFXSystem = $VFXSystem
 @onready var audio_system: AudioSystem = $AudioSystem
+@onready var gold_system: GoldSystem = $GoldSystem
+@onready var item_shop: ItemShop = $ItemShop
 
 ## Hero config resource — all per-hero tuning values.
 @export var hero_config: HeroConfig
@@ -122,6 +124,15 @@ func _ready() -> void:
 	hazard_system.spike_cooldown_duration = match_config.spike_cooldown_duration
 	hazard_system.spike_scaling_per_minute = match_config.spike_scaling_per_minute
 	hazard_system.register_player(player)
+
+	# Wire gold system
+	gold_system.economy_config = preload("res://data/config/default_economy.tres")
+	gold_system.register_player(player)
+
+	# Wire item shop
+	item_shop.gold_system = gold_system
+	item_shop.player = player
+	item_shop.item_purchased.connect(_on_item_purchased)
 
 	# Wire HUD
 	hud.health_component = player_health
@@ -228,6 +239,7 @@ func _on_hook_hit(_target: Node3D) -> void:
 	hud.update_hook_stats()
 	hud.show_hit_marker()
 	hero_level.add_xp(hero_config.xp_on_hook_hit)
+	gold_system.award_hit_gold(player.get_instance_id())
 	game_camera.shake(0.15)
 	# Per-hero hit flash + sound
 	if vfx_system:
@@ -243,8 +255,9 @@ func _on_level_up(new_level: int) -> void:
 	hud.show_level_up(new_level)
 
 func _on_target_killed(target: Node3D, _damage_type: String) -> void:
-	# XP for kill and streak
+	# XP and gold for kill
 	hero_level.add_xp(hero_config.xp_on_kill)
+	gold_system.award_kill_gold(player.get_instance_id())
 	game_camera.shake(0.3)
 	_kill_streak += 1
 	hud.show_kill_announcement(_kill_streak)
@@ -301,6 +314,7 @@ func _on_match_state_changed(new_state: MatchStateManager.State) -> void:
 	match new_state:
 		MatchStateManager.State.PLAYING:
 			hazard_system.activate()
+			gold_system.activate()
 			if audio_system:
 				audio_system.play_match_start()
 				audio_system.start_ambient()
@@ -309,6 +323,7 @@ func _on_match_state_changed(new_state: MatchStateManager.State) -> void:
 				audio_system.set_overtime_ambient()
 		MatchStateManager.State.ENDED:
 			hazard_system.deactivate()
+			gold_system.deactivate()
 			if audio_system:
 				audio_system.stop_ambient()
 
@@ -347,9 +362,29 @@ func _on_kill_occurred(killer_team: int, team_kills_arr: Array[int]) -> void:
 		match_state._end_match(killer_team, "kill_target")
 	hud.update_scores()
 
+func _on_item_purchased(item: ItemData) -> void:
+	# Apply item stat bonuses to player systems
+	if item.damage_bonus > 0:
+		hook_system.hook_damage *= (1.0 + item.damage_bonus)
+	if item.speed_bonus > 0:
+		player.move_speed *= (1.0 + item.speed_bonus)
+	if item.range_bonus > 0:
+		hook_system.hook_range *= (1.0 + item.range_bonus)
+	if item.cooldown_reduction > 0:
+		hook_system.hook_cooldown *= (1.0 - item.cooldown_reduction)
+		input_manager.set_hook_cooldown(hook_system.hook_cooldown)
+	if item.return_speed_bonus > 0:
+		hook_system.hook_return_speed *= (1.0 + item.return_speed_bonus)
+	if item.health_bonus > 0:
+		var health: HealthComponent = player.get_node("HealthComponent")
+		health.max_health += item.health_bonus
+		health.current_health += item.health_bonus
+		health.health_changed.emit(health.current_health, health.max_health)
+
 func _on_assist_awarded(assister: Node) -> void:
 	if assister == player:
 		hero_level.add_xp(hero_config.xp_on_assist)
+		gold_system.award_assist_gold(player.get_instance_id())
 		hud.show_assist()
 
 func _on_kill_feed_updated(entries: Array[Dictionary]) -> void:
@@ -365,6 +400,9 @@ func _on_match_ended(winner_team: int, _reason: String) -> void:
 	)
 
 func _on_play_again() -> void:
+	# Reset gold and economy
+	gold_system.reset()
+
 	# Reset score system
 	score_system._frozen = false
 	score_system.team_kills = [0, 0]

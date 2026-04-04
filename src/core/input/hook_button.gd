@@ -53,12 +53,23 @@ func handle_touch(event: InputEventScreenTouch) -> bool:
 		if _state == State.READY:
 			_touch_index = event.index
 			hook_pressed.emit()
+			# Visual press feedback: brief scale pulse
+			_show_press_feedback()
 			return true
 	else:
 		if event.index == _touch_index:
 			_touch_index = -1
 			return true
 	return false
+
+func _show_press_feedback() -> void:
+	if _base == null:
+		return
+	var original_scale := _base.scale
+	_base.scale = Vector2(0.85, 0.85)
+	var tween := create_tween()
+	tween.tween_property(_base, "scale", Vector2(1.1, 1.1), 0.08).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_base, "scale", original_scale, 0.1).set_ease(Tween.EASE_IN)
 
 func _process(delta: float) -> void:
 	if _state == State.COOLDOWN:

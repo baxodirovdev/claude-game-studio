@@ -31,6 +31,11 @@ var _active_projectile: HookProjectile = null
 var _pull_target: PlayerController = null
 var _grapple_active: bool = false
 
+# Beam state (Flux)
+var _beam_active: bool = false
+var _beam_target: Node3D = null
+var _beam_elapsed: float = 0.0
+
 # Stats
 var hooks_fired: int = 0
 var hooks_hit: int = 0
@@ -40,6 +45,12 @@ var hooks_missed: int = 0
 func fire(facing_angle: float) -> bool:
 	if _active_projectile != null:
 		return false
+	if _beam_active:
+		return false
+
+	# Beam hook type: scan and lock-on instead of projectile
+	if hero_config and hero_config.hook_type == HeroConfig.HookType.BEAM:
+		return _fire_beam(facing_angle)
 
 	hooks_fired += 1
 
@@ -170,6 +181,10 @@ func _start_pull_monitor() -> void:
 	set_physics_process(true)
 
 func _physics_process(delta: float) -> void:
+	if _beam_active:
+		_process_beam(delta)
+		return
+
 	if _grapple_active:
 		_process_grapple_monitor()
 		return
@@ -243,6 +258,119 @@ func _find_health(node: Node) -> HealthComponent:
 
 func _ready() -> void:
 	set_physics_process(false)  # Only enable during pull monitoring
+
+## --- Beam Hook (Flux) ---
+
+func _fire_beam(facing_angle: float) -> bool:
+	hooks_fired += 1
+
+	var face_dir := Vector2(cos(facing_angle), -sin(facing_angle))
+	var world_dir := Vector3(face_dir.x, 0, face_dir.y).normalized()
+
+	# Scan for target in cone
+	var target := _find_beam_target(world_dir)
+	if target == null:
+		hooks_missed += 1
+		hook_missed.emit()
+		# Brief lockout
+		player.lock()
+		input_manager.notify_hook_fired()
+		input_manager.lock_joystick()
+		hook_fired.emit()
+		get_tree().create_timer(0.3).timeout.connect(func() -> void:
+			player.unlock()
+			input_manager.unlock_joystick()
+			input_manager.notify_hook_returned()
+			hook_returned.emit()
+		)
+		return true
+
+	# Lock on
+	hooks_hit += 1
+	_beam_active = true
+	_beam_target = target
+	_beam_elapsed = 0.0
+
+	player.lock()
+	input_manager.notify_hook_fired()
+	input_manager.lock_joystick()
+	hook_fired.emit()
+	hook_hit.emit(target)
+
+	set_physics_process(true)
+	return true
+
+func _find_beam_target(direction: Vector3) -> Node3D:
+	var cone_cos := cos(deg_to_rad(hero_config.beam_aim_cone))
+	var best_target: Node3D = null
+	var best_dist := INF
+
+	for target in get_tree().get_nodes_in_group("hookable"):
+		if target == player:
+			continue
+		if not target.visible:
+			continue
+		var to_target := target.global_position - player.global_position
+		to_target.y = 0
+		var dist := to_target.length()
+		if dist > hook_range or dist < 0.5:
+			continue
+		var dot := to_target.normalized().dot(direction)
+		if dot >= cone_cos and dist < best_dist:
+			best_dist = dist
+			best_target = target
+
+	return best_target
+
+func _process_beam(delta: float) -> void:
+	if not _beam_active or _beam_target == null:
+		_end_beam()
+		return
+
+	if not is_instance_valid(_beam_target) or not _beam_target.visible:
+		_end_beam()
+		return
+
+	_beam_elapsed += delta
+
+	# Deal DPS
+	var health := _find_health(_beam_target)
+	if health:
+		var dmg := hero_config.beam_dps * delta
+		health.take_damage(dmg, player, "HOOK")
+		if health.is_dead:
+			target_killed.emit(_beam_target, "HOOK")
+			_end_beam()
+			return
+
+	# Slowly pull target toward player
+	var to_player := player.global_position - _beam_target.global_position
+	to_player.y = 0
+	if to_player.length() > 1.5:
+		_beam_target.global_position += to_player.normalized() * hero_config.beam_pull_speed * delta
+
+	# Check range break
+	var dist := player.global_position.distance_to(_beam_target.global_position)
+	if dist > hook_range * 1.5:
+		_end_beam()
+		return
+
+	# Check duration
+	if _beam_elapsed >= hero_config.beam_duration:
+		_end_beam()
+
+func _end_beam() -> void:
+	_beam_active = false
+	_beam_target = null
+	_beam_elapsed = 0.0
+	player.unlock()
+	input_manager.unlock_joystick()
+	input_manager.notify_hook_returned()
+	hook_returned.emit()
+
+	# Check if we should stop physics processing
+	if _pull_target == null and not _grapple_active:
+		set_physics_process(false)
 
 ## --- Networking RPCs ---
 

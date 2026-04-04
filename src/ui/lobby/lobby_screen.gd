@@ -223,6 +223,8 @@ func _hero_path_to_name(path: String) -> String:
 			return "Lash"
 		"res://data/heroes/maw.tres":
 			return "Maw"
+		"res://data/heroes/flux.tres":
+			return "Flux"
 		_:
 			return "Vex"
 

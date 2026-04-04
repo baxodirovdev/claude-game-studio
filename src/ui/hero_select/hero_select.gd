@@ -10,16 +10,19 @@ signal hero_selected(config: HeroConfig)
 var _vex_config: HeroConfig = preload("res://data/heroes/vex.tres")
 var _lash_config: HeroConfig = preload("res://data/heroes/lash.tres")
 var _maw_config: HeroConfig = preload("res://data/heroes/maw.tres")
+var _flux_config: HeroConfig = preload("res://data/heroes/flux.tres")
 
 @onready var vex_button: Button = $Panel/VBox/VexButton
 @onready var lash_button: Button = $Panel/VBox/LashButton
 @onready var maw_button: Button = $Panel/VBox/MawButton
+@onready var flux_button: Button = $Panel/VBox/FluxButton
 @onready var panel: PanelContainer = $Panel
 
 func _ready() -> void:
 	vex_button.pressed.connect(func() -> void: _select(_vex_config))
 	lash_button.pressed.connect(func() -> void: _select(_lash_config))
 	maw_button.pressed.connect(func() -> void: _select(_maw_config))
+	flux_button.pressed.connect(func() -> void: _select(_flux_config))
 
 func show_selection() -> void:
 	visible = true

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/config/item_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+item_id = "sharpened_hook"
+display_name = "Sharpened Hook"
+description = "+15% hook damage"
+category = 0
+icon_color = Color(1.0, 0.3, 0.3, 1)
+cost = 200
+damage_bonus = 0.15

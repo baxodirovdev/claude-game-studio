@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/config/item_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+item_id = "quick_reel"
+display_name = "Quick Reel"
+description = "-20% cooldown, +10% return speed"
+category = 2
+icon_color = Color(0.9, 0.8, 0.2, 1)
+cost = 300
+cooldown_reduction = 0.20
+return_speed_bonus = 0.10

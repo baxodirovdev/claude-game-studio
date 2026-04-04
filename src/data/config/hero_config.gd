@@ -6,7 +6,7 @@
 class_name HeroConfig
 extends Resource
 
-enum HookType { PULL, GRAPPLE, BOOMERANG }
+enum HookType { PULL, GRAPPLE, BOOMERANG, BEAM }
 
 @export_group("Identity")
 ## Unique hero identifier.
@@ -51,6 +51,16 @@ enum HookType { PULL, GRAPPLE, BOOMERANG }
 @export var boomerang_return_damage: float = 30.0
 ## Hitbox radius multiplier on return pass (wider = more forgiving).
 @export var boomerang_return_hitbox_mult: float = 1.0
+
+@export_group("Beam (Flux)")
+## Beam lock-on duration in seconds. BEAM type only.
+@export var beam_duration: float = 1.5
+## Damage per second while beam is locked on.
+@export var beam_dps: float = 25.0
+## Beam auto-aim cone angle in degrees (how forgiving the targeting is).
+@export var beam_aim_cone: float = 15.0
+## Pull speed while beam is active (units/second toward hooker).
+@export var beam_pull_speed: float = 4.0
 
 @export_group("Leveling")
 ## XP gained per hook hit (non-lethal).

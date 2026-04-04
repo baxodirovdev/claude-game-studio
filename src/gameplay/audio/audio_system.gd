@@ -56,6 +56,12 @@ func _ready() -> void:
 		"hit": _generate_tone(600.0, 0.15, -2.0),  # Meaty impact thud
 		"miss": _generate_buzz(120.0, 0.3, -8.0),  # Fading spin
 	}
+	# BEAM (Flux): Electric hum — sustained, crackling
+	_hero_sfx[HeroConfig.HookType.BEAM] = {
+		"fire": _generate_sweep(300.0, 600.0, 0.2, -5.0),  # Charging up
+		"hit": _generate_tone(500.0, 0.1, -3.0),  # Electric lock-on snap
+		"miss": _generate_sweep(500.0, 150.0, 0.2, -10.0),  # Power down
+	}
 
 ## Play hook fire sound for a specific hero type.
 func play_hook_fire(hook_type: int = HeroConfig.HookType.PULL) -> void:

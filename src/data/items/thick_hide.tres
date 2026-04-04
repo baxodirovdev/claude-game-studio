@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/config/item_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+item_id = "thick_hide"
+display_name = "Thick Hide"
+description = "+40 health, +5% speed"
+category = 1
+icon_color = Color(0.3, 0.5, 0.8, 1)
+cost = 350
+health_bonus = 40.0
+speed_bonus = 0.05

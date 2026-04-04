@@ -93,5 +93,13 @@ func _route_drag(event: InputEventScreenDrag) -> void:
 func _on_hook_pressed() -> void:
 	hook_fire_requested.emit(joystick.get_facing_angle())
 
+## Set the joystick dead zone radius (from settings).
+func set_dead_zone(radius: float) -> void:
+	joystick.dead_zone_radius = radius
+
+## Set the joystick sensitivity multiplier.
+func set_sensitivity(multiplier: float) -> void:
+	joystick.joystick_radius = 100.0 / maxf(multiplier, 0.1)
+
 func _update_visibility() -> void:
 	visible = _enabled
