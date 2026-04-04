@@ -411,7 +411,7 @@ func _find_beam_target(direction: Vector3) -> Node3D:
 			continue
 		if not target.visible:
 			continue
-		var to_target := target.global_position - player.global_position
+		var to_target: Vector3 = target.global_position - player.global_position
 		to_target.y = 0
 		var dist := to_target.length()
 		if dist > hook_range or dist < 0.5:
