@@ -266,7 +266,7 @@ func update_kill_feed(entries: Array[Dictionary]) -> void:
 		else:
 			label.text = "%s > %s" % [entry["killer_name"], entry["victim_name"]]
 			# Color based on whether killer is on player's team
-			var is_friendly := entry.get("killer_team", -1) == (player.team_id if player else -1)
+			var is_friendly: bool = entry.get("killer_team", -1) == (player.team_id if player else -1)
 			if is_friendly:
 				label.add_theme_color_override("font_color", TEAM_A_COLOR)
 			else:
