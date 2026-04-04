@@ -8,9 +8,9 @@ class_name GameHUD
 extends CanvasLayer
 
 ## Health bar color thresholds.
-const HEALTH_GREEN := Color(0.2, 0.8, 0.2)
-const HEALTH_YELLOW := Color(0.9, 0.8, 0.1)
-const HEALTH_RED := Color(0.9, 0.15, 0.15)
+const HEALTH_GREEN := Color(0.15, 0.9, 0.3)
+const HEALTH_YELLOW := Color(1.0, 0.85, 0.0)
+const HEALTH_RED := Color(1.0, 0.15, 0.15)
 const GHOST_DECAY_SPEED := 3.0
 const LOW_HEALTH_THRESHOLD := 0.25
 const FINAL_COUNTDOWN_THRESHOLD := 30.0
@@ -45,9 +45,9 @@ var hero_level: HeroLevelSystem
 var hero_config: HeroConfig
 var player: PlayerController
 
-## Team colors for UI.
-const TEAM_A_COLOR := Color(0.3, 0.5, 1.0)
-const TEAM_B_COLOR := Color(1.0, 0.35, 0.3)
+## Team colors for UI (Brawl Stars vibrant).
+const TEAM_A_COLOR := Color(0.2, 0.6, 1.0)
+const TEAM_B_COLOR := Color(1.0, 0.25, 0.25)
 
 var _ghost_fill: float = 1.0
 var _health_bar_max_width: float = 200.0
@@ -203,9 +203,11 @@ func on_match_state_changed(new_state: MatchStateManager.State) -> void:
 		MatchStateManager.State.OVERTIME:
 			hide_countdown()
 			timer_label.text = "OVERTIME"
-			timer_label.add_theme_color_override("font_color", Color.RED)
+			timer_label.add_theme_font_size_override("font_size", 28)
+			timer_label.add_theme_color_override("font_color", GameThemeGenerator.ACCENT_RED)
 			kill_target_label.text = "NEXT KILL WINS"
-			kill_target_label.add_theme_color_override("font_color", Color.RED)
+			kill_target_label.add_theme_font_size_override("font_size", 20)
+			kill_target_label.add_theme_color_override("font_color", GameThemeGenerator.ACCENT_ORANGE)
 		MatchStateManager.State.ENDED:
 			hide_countdown()
 			timer_label.text = ""

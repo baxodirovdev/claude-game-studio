@@ -16,7 +16,7 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-color = Color(0.08, 0.08, 0.12, 1)
+color = Color(0.06, 0.07, 0.14, 1)
 
 [node name="VBox" type="VBoxContainer" parent="."]
 layout_mode = 1
@@ -25,43 +25,60 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -140.0
-offset_top = -160.0
-offset_right = 140.0
-offset_bottom = 160.0
-theme_override_constants/separation = 16
+offset_left = -180.0
+offset_top = -210.0
+offset_right = 180.0
+offset_bottom = 210.0
+theme_override_constants/separation = 14
 
 [node name="TitleLabel" type="Label" parent="VBox"]
 layout_mode = 2
 text = "HOOK WARS"
 horizontal_alignment = 1
-theme_override_font_sizes/font_size = 48
+theme_override_font_sizes/font_size = 64
+
+[node name="Subtitle" type="Label" parent="VBox"]
+layout_mode = 2
+text = "PUDGE MODE"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.5, 0.55, 0.7, 1)
 
 [node name="Spacer" type="Control" parent="VBox"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 20)
+custom_minimum_size = Vector2(0, 10)
 
 [node name="PlaySoloButton" type="Button" parent="VBox"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 50)
-text = "PLAY SOLO"
-theme_override_font_sizes/font_size = 20
+custom_minimum_size = Vector2(0, 64)
+text = "PLAY"
+theme_override_font_sizes/font_size = 28
 
 [node name="PlayMultiButton" type="Button" parent="VBox"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 50)
-text = "PLAY MULTIPLAYER"
-theme_override_font_sizes/font_size = 20
+custom_minimum_size = Vector2(0, 56)
+text = "MULTIPLAYER"
+theme_override_font_sizes/font_size = 22
 
-[node name="SettingsButton" type="Button" parent="VBox"]
+[node name="Spacer2" type="Control" parent="VBox"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 40)
+custom_minimum_size = Vector2(0, 6)
+
+[node name="BottomRow" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="SettingsButton" type="Button" parent="VBox/BottomRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 48)
 text = "SETTINGS"
 theme_override_font_sizes/font_size = 18
 
-[node name="QuitButton" type="Button" parent="VBox"]
+[node name="QuitButton" type="Button" parent="VBox/BottomRow"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 40)
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 48)
 text = "QUIT"
 theme_override_font_sizes/font_size = 18
 
@@ -74,7 +91,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = -100.0
 offset_top = -24.0
-text = "v0.4.0-dev"
+text = "v0.5.0"
 horizontal_alignment = 2
 theme_override_font_sizes/font_size = 12
 

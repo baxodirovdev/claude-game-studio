@@ -87,15 +87,16 @@ func _record_profile(winner_team: int, player_team: int) -> void:
 		stats_container.add_child(lvl_label)
 
 func _set_title(winner_team: int, player_team: int) -> void:
+	title_label.add_theme_font_size_override("font_size", 52)
 	if winner_team == player_team:
-		title_label.text = "VICTORY"
-		title_label.add_theme_color_override("font_color", Color(0.2, 1.0, 0.3))
+		title_label.text = "VICTORY!"
+		title_label.add_theme_color_override("font_color", GameThemeGenerator.ACCENT_GREEN)
 	elif winner_team < 0:
 		title_label.text = "DRAW"
-		title_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+		title_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.8))
 	else:
 		title_label.text = "DEFEAT"
-		title_label.add_theme_color_override("font_color", Color(1.0, 0.2, 0.2))
+		title_label.add_theme_color_override("font_color", GameThemeGenerator.ACCENT_RED)
 
 func _populate_stats() -> void:
 	# Clear previous entries
@@ -140,15 +141,15 @@ func _populate_stats() -> void:
 
 		var name_label := Label.new()
 		name_label.text = line_data["label"]
-		name_label.add_theme_font_size_override("font_size", 18)
-		name_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+		name_label.add_theme_font_size_override("font_size", 20)
+		name_label.add_theme_color_override("font_color", Color(0.55, 0.6, 0.75))
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		hbox.add_child(name_label)
 
 		var value_label := Label.new()
 		value_label.text = line_data["value"]
-		value_label.add_theme_font_size_override("font_size", 18)
-		value_label.add_theme_color_override("font_color", Color.WHITE)
+		value_label.add_theme_font_size_override("font_size", 22)
+		value_label.add_theme_color_override("font_color", GameThemeGenerator.ACCENT_YELLOW)
 		value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		hbox.add_child(value_label)
 
