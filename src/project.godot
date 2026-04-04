@@ -31,6 +31,7 @@ pointing/emulate_mouse_from_touch=true
 
 [autoload]
 
+ThemeManager="*res://assets/theme/theme_manager.gd"
 SceneFlowManager="*res://core/scene_flow/scene_flow_manager.gd"
 NetworkManager="*res://core/network/network_manager.gd"
 

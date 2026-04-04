@@ -17,6 +17,7 @@ extends Control
 func _ready() -> void:
 	title_label.text = "HOOK WARS"
 	title_label.add_theme_font_size_override("font_size", 48)
+	title_label.add_theme_color_override("font_color", GameThemeGenerator.ACCENT_GOLD)
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	version_label.text = "v0.4.0-dev"
