@@ -45,6 +45,7 @@ func _on_peer_connected(id: int) -> void:
 
 func _on_peer_disconnected(id: int) -> void:
 	_log("Peer %d disconnected" % id)
+	_queue.erase(id)
 	_remove_peer_from_room(id)
 
 ## --- Room Management RPCs ---
@@ -107,6 +108,41 @@ func relay_packet(data: PackedByteArray) -> void:
 @rpc("any_peer", "unreliable")
 func relay_packet_unreliable(data: PackedByteArray) -> void:
 	relay_packet(data)
+
+## --- Matchmaking Queue ---
+
+var _queue: Array[int] = []
+
+## Client requests to enter matchmaking queue.
+@rpc("any_peer", "reliable")
+func request_queue_match() -> void:
+	var peer_id := multiplayer.get_remote_sender_id()
+	if peer_id in _queue:
+		return
+	_queue.append(peer_id)
+	_log("Peer %d entered matchmaking queue (size: %d)" % [peer_id, _queue.size()])
+
+	# Try to match
+	if _queue.size() >= 2:
+		var host_id := _queue.pop_front()
+		var client_id := _queue.pop_front()
+
+		# Create room for them
+		var code := _generate_room_code()
+		_rooms[code] = {"host_id": host_id, "clients": [client_id]}
+		_peer_rooms[host_id] = code
+		_peer_rooms[client_id] = code
+
+		_log("Matchmaking: paired %d (host) + %d (client) in room %s" % [host_id, client_id, code])
+
+		# Notify both peers
+		queue_match_found.rpc_id(host_id, code, true)
+		queue_match_found.rpc_id(client_id, code, false)
+
+## Notify client of match found (sent by server).
+@rpc("authority", "reliable")
+func queue_match_found(_code: String, _as_host: bool) -> void:
+	pass  # Client-side handler
 
 ## --- Client-side RPCs (called by server on clients) ---
 

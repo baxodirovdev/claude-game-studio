@@ -14,6 +14,7 @@ var hook_system: HookSystem
 var hero_config: HeroConfig
 var player: PlayerController
 var match_config: Resource
+var player_profile: PlayerProfile
 
 @onready var panel: PanelContainer = $Panel
 @onready var title_label: Label = $Panel/VBox/TitleLabel
@@ -33,8 +34,49 @@ func show_results(winner_team: int, player_team: int) -> void:
 	_set_title(winner_team, player_team)
 	_populate_stats()
 	_show_mvp(winner_team)
+	_record_profile(winner_team, player_team)
 	visible = true
 	play_again_button.grab_focus()
+
+## Record match stats to persistent profile and show XP gain.
+func _record_profile(winner_team: int, player_team: int) -> void:
+	if player_profile == null or score_system == null or player == null:
+		return
+
+	var pid := player.get_instance_id()
+	var stats: Dictionary = score_system.player_stats.get(pid, {})
+	var kills: int = stats.get("kills", 0)
+	var deaths: int = stats.get("deaths", 0)
+	var assists: int = stats.get("assists", 0)
+	var won := winner_team == player_team
+
+	# Calculate match XP: kills*10 + assists*5 + win bonus 50
+	var xp_earned := kills * 10 + assists * 5
+	if won:
+		xp_earned += 50
+
+	var old_level := player_profile.get_level()
+	player_profile.record_match(
+		hero_config.hero_id if hero_config else "unknown",
+		won, kills, deaths, assists, xp_earned
+	)
+	var new_level := player_profile.get_level()
+
+	# Add XP info to stats display
+	var xp_label := Label.new()
+	xp_label.text = "+%d XP" % xp_earned
+	xp_label.add_theme_font_size_override("font_size", 20)
+	xp_label.add_theme_color_override("font_color", Color(0.3, 0.8, 1.0))
+	xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stats_container.add_child(xp_label)
+
+	if new_level > old_level:
+		var lvl_label := Label.new()
+		lvl_label.text = "LEVEL UP! → %d" % new_level
+		lvl_label.add_theme_font_size_override("font_size", 22)
+		lvl_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+		lvl_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		stats_container.add_child(lvl_label)
 
 func _set_title(winner_team: int, player_team: int) -> void:
 	if winner_team == player_team:

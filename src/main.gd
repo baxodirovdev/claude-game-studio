@@ -23,6 +23,7 @@ extends Node3D
 @onready var audio_system: AudioSystem = $AudioSystem
 @onready var gold_system: GoldSystem = $GoldSystem
 @onready var item_shop: ItemShop = $ItemShop
+@onready var player_profile: PlayerProfile = $PlayerProfile
 
 ## Hero config resource — all per-hero tuning values.
 @export var hero_config: HeroConfig
@@ -150,6 +151,7 @@ func _ready() -> void:
 	match_results.hero_config = hero_config
 	match_results.player = player
 	match_results.match_config = match_config
+	match_results.player_profile = player_profile
 	match_results.play_again_requested.connect(_on_play_again)
 
 func _on_arena_ready() -> void:
