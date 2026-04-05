@@ -68,6 +68,45 @@ func _ready() -> void:
 	hero_name_label.text = ""
 	level_label.text = "Lv.1"
 	xp_bar_fill.size.x = 0
+	_apply_brawl_style()
+
+## Apply Brawl Stars-style formatting to HUD elements.
+func _apply_brawl_style() -> void:
+	# Timer — large bold centered
+	timer_label.add_theme_font_size_override("font_size", 26)
+	timer_label.add_theme_color_override("font_color", Color.WHITE)
+
+	# Score — big vibrant numbers
+	score_label.add_theme_font_size_override("font_size", 28)
+
+	# Kill target — accent colored
+	kill_target_label.add_theme_font_size_override("font_size", 16)
+	kill_target_label.add_theme_color_override("font_color", GameThemeGenerator.ACCENT_YELLOW)
+
+	# Hero name — accent
+	hero_name_label.add_theme_font_size_override("font_size", 18)
+	hero_name_label.add_theme_color_override("font_color", GameThemeGenerator.ACCENT_CYAN)
+
+	# Level — bold gold
+	level_label.add_theme_font_size_override("font_size", 16)
+	level_label.add_theme_color_override("font_color", GameThemeGenerator.ACCENT_YELLOW)
+
+	# Stats — smaller, subtle
+	stats_label.add_theme_font_size_override("font_size", 14)
+	stats_label.add_theme_color_override("font_color", Color(0.7, 0.75, 0.85))
+
+	# Countdown — massive centered
+	countdown_label.add_theme_font_size_override("font_size", 72)
+
+	# Result — handled in show_match_result
+
+	# Respawn — red, urgent
+	respawn_label.add_theme_font_size_override("font_size", 22)
+	respawn_label.add_theme_color_override("font_color", GameThemeGenerator.ACCENT_RED)
+
+	# Invuln indicator
+	invuln_label.add_theme_font_size_override("font_size", 14)
+	invuln_label.add_theme_color_override("font_color", GameThemeGenerator.ACCENT_CYAN)
 
 func _process(delta: float) -> void:
 	_update_health_bar(delta)

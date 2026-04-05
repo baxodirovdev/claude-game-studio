@@ -32,50 +32,181 @@ static func build_model(parent: Node3D, hero_config: HeroConfig) -> void:
 		_:
 			_build_pudge(model, hero_config.hero_color)
 
-## Pudge — bulky, round, menacing. Wide body, small head, thick arms.
+## Pudge — massive, stitched-together butcher. Inspired by Dota 2 Pudge.
+## Built from ~25 primitives for maximum detail without external models.
 static func _build_pudge(model: Node3D, color: Color) -> void:
-	var body_mat := _make_mat(color, 0.7, 0.1)
-	var dark_mat := _make_mat(color.darkened(0.3), 0.6, 0.15)
-	var eye_mat := _make_mat(Color(1.0, 0.9, 0.2), 0.3, 0.0, true, Color(1.0, 0.8, 0.1), 2.0)
+	# Materials
+	var skin_mat := _make_mat(color, 0.75, 0.05)
+	var skin_dark := _make_mat(color.darkened(0.25), 0.7, 0.08)
+	var skin_light := _make_mat(color.lightened(0.1), 0.8, 0.05)
+	var eye_mat := _make_mat(Color(1.0, 0.85, 0.1), 0.2, 0.0, true, Color(1.0, 0.7, 0.0), 3.0)
+	var pupil_mat := _make_mat(Color(0.15, 0.05, 0.05), 0.9, 0.0)
+	var metal_mat := _make_mat(Color(0.45, 0.42, 0.4), 0.35, 0.7)
+	var metal_dark := _make_mat(Color(0.3, 0.28, 0.26), 0.4, 0.6)
+	var stitch_mat := _make_mat(Color(0.2, 0.15, 0.1), 0.9, 0.0)
+	var mouth_mat := _make_mat(Color(0.4, 0.08, 0.08), 0.6, 0.1)
+	var belt_mat := _make_mat(Color(0.35, 0.2, 0.1), 0.7, 0.15)
 
-	# Torso — wide sphere
-	var torso := _mesh(SphereMesh.new(), body_mat)
-	(torso.mesh as SphereMesh).radius = 0.55
-	(torso.mesh as SphereMesh).height = 0.9
+	# --- TORSO: massive bloated belly ---
+	var torso := _mesh(SphereMesh.new(), skin_mat)
+	(torso.mesh as SphereMesh).radius = 0.6
+	(torso.mesh as SphereMesh).height = 1.0
 	torso.position = Vector3(0, 0.5, 0)
 	model.add_child(torso)
 
-	# Belly — slightly larger, overlapping
-	var belly := _mesh(SphereMesh.new(), body_mat)
-	(belly.mesh as SphereMesh).radius = 0.5
-	(belly.mesh as SphereMesh).height = 0.7
-	belly.position = Vector3(0, 0.3, 0.1)
+	# Lower belly bulge (hangs forward)
+	var belly := _mesh(SphereMesh.new(), skin_light)
+	(belly.mesh as SphereMesh).radius = 0.55
+	(belly.mesh as SphereMesh).height = 0.75
+	belly.position = Vector3(0, 0.28, 0.15)
 	model.add_child(belly)
 
-	# Head — smaller sphere on top
-	var head := _mesh(SphereMesh.new(), dark_mat)
-	(head.mesh as SphereMesh).radius = 0.28
-	(head.mesh as SphereMesh).height = 0.5
-	head.position = Vector3(0, 1.0, 0)
+	# Upper chest (slightly darker, stitched area)
+	var chest := _mesh(SphereMesh.new(), skin_dark)
+	(chest.mesh as SphereMesh).radius = 0.48
+	(chest.mesh as SphereMesh).height = 0.6
+	chest.position = Vector3(0, 0.75, -0.05)
+	model.add_child(chest)
+
+	# Belt/waistband
+	var belt := _mesh(CylinderMesh.new(), belt_mat)
+	(belt.mesh as CylinderMesh).top_radius = 0.58
+	(belt.mesh as CylinderMesh).bottom_radius = 0.55
+	(belt.mesh as CylinderMesh).height = 0.12
+	belt.position = Vector3(0, 0.15, 0.05)
+	model.add_child(belt)
+
+	# Belt buckle
+	var buckle := _mesh(BoxMesh.new(), metal_mat)
+	(buckle.mesh as BoxMesh).size = Vector3(0.15, 0.12, 0.06)
+	buckle.position = Vector3(0, 0.15, -0.55)
+	model.add_child(buckle)
+
+	# --- STITCHES: visible lines across body ---
+	# Vertical stitch down center
+	var stitch_v := _mesh(BoxMesh.new(), stitch_mat)
+	(stitch_v.mesh as BoxMesh).size = Vector3(0.03, 0.6, 0.03)
+	stitch_v.position = Vector3(0, 0.55, -0.58)
+	model.add_child(stitch_v)
+
+	# Horizontal stitches
+	for y_off in [0.35, 0.55, 0.75]:
+		var stitch_h := _mesh(BoxMesh.new(), stitch_mat)
+		(stitch_h.mesh as BoxMesh).size = Vector3(0.4, 0.025, 0.03)
+		stitch_h.position = Vector3(0, y_off, -0.56)
+		model.add_child(stitch_h)
+
+	# --- HEAD: small, hunched into shoulders ---
+	var head := _mesh(SphereMesh.new(), skin_dark)
+	(head.mesh as SphereMesh).radius = 0.25
+	(head.mesh as SphereMesh).height = 0.42
+	head.position = Vector3(0, 1.05, -0.08)
 	model.add_child(head)
 
-	# Eyes — two small glowing spheres
-	for side in [-1.0, 1.0]:
-		var eye := _mesh(SphereMesh.new(), eye_mat)
-		(eye.mesh as SphereMesh).radius = 0.06
-		(eye.mesh as SphereMesh).height = 0.12
-		eye.position = Vector3(side * 0.12, 1.05, -0.22)
-		model.add_child(eye)
+	# Jaw (wider lower face)
+	var jaw := _mesh(SphereMesh.new(), skin_mat)
+	(jaw.mesh as SphereMesh).radius = 0.18
+	(jaw.mesh as SphereMesh).height = 0.2
+	jaw.position = Vector3(0, 0.92, -0.18)
+	model.add_child(jaw)
 
-	# Arms — cylinders
+	# Mouth (dark slit)
+	var mouth := _mesh(BoxMesh.new(), mouth_mat)
+	(mouth.mesh as BoxMesh).size = Vector3(0.15, 0.04, 0.04)
+	mouth.position = Vector3(0, 0.93, -0.34)
+	model.add_child(mouth)
+
+	# Eyes — asymmetric, one bigger (Pudge's deranged look)
+	var eye_l := _mesh(SphereMesh.new(), eye_mat)
+	(eye_l.mesh as SphereMesh).radius = 0.065
+	(eye_l.mesh as SphereMesh).height = 0.13
+	eye_l.position = Vector3(-0.1, 1.08, -0.28)
+	model.add_child(eye_l)
+
+	var eye_r := _mesh(SphereMesh.new(), eye_mat)
+	(eye_r.mesh as SphereMesh).radius = 0.05
+	(eye_r.mesh as SphereMesh).height = 0.1
+	eye_r.position = Vector3(0.1, 1.06, -0.28)
+	model.add_child(eye_r)
+
+	# Pupils
+	for pos in [Vector3(-0.1, 1.08, -0.34), Vector3(0.1, 1.06, -0.33)]:
+		var pupil := _mesh(SphereMesh.new(), pupil_mat)
+		(pupil.mesh as SphereMesh).radius = 0.025
+		(pupil.mesh as SphereMesh).height = 0.05
+		pupil.position = pos
+		model.add_child(pupil)
+
+	# --- ARMS: thick, meaty, different sizes ---
+	# Left arm (hook arm — slightly bigger)
+	var arm_l := _mesh(CylinderMesh.new(), skin_dark)
+	(arm_l.mesh as CylinderMesh).top_radius = 0.16
+	(arm_l.mesh as CylinderMesh).bottom_radius = 0.12
+	(arm_l.mesh as CylinderMesh).height = 0.55
+	arm_l.position = Vector3(-0.65, 0.55, 0)
+	arm_l.rotation_degrees = Vector3(0, 0, 25)
+	model.add_child(arm_l)
+
+	# Left hand/fist
+	var hand_l := _mesh(SphereMesh.new(), skin_mat)
+	(hand_l.mesh as SphereMesh).radius = 0.1
+	(hand_l.mesh as SphereMesh).height = 0.15
+	hand_l.position = Vector3(-0.8, 0.3, 0)
+	model.add_child(hand_l)
+
+	# Right arm (cleaver arm)
+	var arm_r := _mesh(CylinderMesh.new(), skin_dark)
+	(arm_r.mesh as CylinderMesh).top_radius = 0.14
+	(arm_r.mesh as CylinderMesh).bottom_radius = 0.1
+	(arm_r.mesh as CylinderMesh).height = 0.5
+	arm_r.position = Vector3(0.63, 0.55, 0)
+	arm_r.rotation_degrees = Vector3(0, 0, -25)
+	model.add_child(arm_r)
+
+	# Right hand
+	var hand_r := _mesh(SphereMesh.new(), skin_mat)
+	(hand_r.mesh as SphereMesh).radius = 0.09
+	(hand_r.mesh as SphereMesh).height = 0.13
+	hand_r.position = Vector3(0.77, 0.32, 0)
+	model.add_child(hand_r)
+
+	# --- CLEAVER: held in right hand ---
+	# Blade (flat box)
+	var blade := _mesh(BoxMesh.new(), metal_mat)
+	(blade.mesh as BoxMesh).size = Vector3(0.04, 0.35, 0.2)
+	blade.position = Vector3(0.82, 0.45, -0.12)
+	blade.rotation_degrees = Vector3(0, 0, -15)
+	model.add_child(blade)
+
+	# Blade edge (thinner, lighter)
+	var edge := _mesh(BoxMesh.new(), _make_mat(Color(0.6, 0.58, 0.55), 0.2, 0.8))
+	(edge.mesh as BoxMesh).size = Vector3(0.015, 0.32, 0.2)
+	edge.position = Vector3(0.85, 0.45, -0.12)
+	edge.rotation_degrees = Vector3(0, 0, -15)
+	model.add_child(edge)
+
+	# Handle
+	var handle := _mesh(CylinderMesh.new(), metal_dark)
+	(handle.mesh as CylinderMesh).top_radius = 0.025
+	(handle.mesh as CylinderMesh).bottom_radius = 0.03
+	(handle.mesh as CylinderMesh).height = 0.15
+	handle.position = Vector3(0.8, 0.28, -0.12)
+	model.add_child(handle)
+
+	# --- LEGS: short, stubby ---
 	for side in [-1.0, 1.0]:
-		var arm := _mesh(CylinderMesh.new(), dark_mat)
-		(arm.mesh as CylinderMesh).top_radius = 0.1
-		(arm.mesh as CylinderMesh).bottom_radius = 0.14
-		(arm.mesh as CylinderMesh).height = 0.5
-		arm.position = Vector3(side * 0.55, 0.5, 0)
-		arm.rotation_degrees = Vector3(0, 0, side * -20)
-		model.add_child(arm)
+		var leg := _mesh(CylinderMesh.new(), skin_dark)
+		(leg.mesh as CylinderMesh).top_radius = 0.14
+		(leg.mesh as CylinderMesh).bottom_radius = 0.12
+		(leg.mesh as CylinderMesh).height = 0.3
+		leg.position = Vector3(side * 0.22, 0.0, 0)
+		model.add_child(leg)
+
+		# Feet
+		var foot := _mesh(BoxMesh.new(), skin_dark)
+		(foot.mesh as BoxMesh).size = Vector3(0.16, 0.08, 0.22)
+		foot.position = Vector3(side * 0.22, -0.12, -0.04)
+		model.add_child(foot)
 
 ## Lash — slim, agile. Thin body, long limbs.
 static func _build_lash(model: Node3D, color: Color) -> void:
