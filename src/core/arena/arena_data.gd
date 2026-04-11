@@ -33,21 +33,11 @@ extends Resource
 
 @export_group("Hazards")
 ## Spike zone positions (center of each zone).
-@export var spike_zones: Array[Vector3] = [
-	Vector3(-4, 0, -8),
-	Vector3(-4, 0, 8),
-	Vector3(4, 0, -8),
-	Vector3(4, 0, 8),
-]
+@export var spike_zones: Array[Vector3] = []
 ## Spike zone radius.
 @export var spike_zone_radius: float = 3.0
 ## Pit positions (center of each pit).
-@export var pit_zones: Array[Vector3] = [
-	Vector3(-10, 0, -10),
-	Vector3(-10, 0, 10),
-	Vector3(10, 0, -10),
-	Vector3(10, 0, 10),
-]
+@export var pit_zones: Array[Vector3] = []
 ## Pit radius.
 @export var pit_radius: float = 2.0
 

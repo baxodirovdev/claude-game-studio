@@ -15,6 +15,7 @@ signal arena_ready
 var _walls_node: Node3D
 var _ground_node: Node3D
 var _hazards_node: Node3D
+var _props: ArenaProps
 
 func _ready() -> void:
 	if arena_data == null:
@@ -83,6 +84,13 @@ func _build_arena() -> void:
 	_build_gap_visual()
 	_build_collision_walls()
 	_build_hazard_markers()
+	_build_props()
+
+func _build_props() -> void:
+	_props = ArenaProps.new()
+	_props.name = "Props"
+	add_child(_props)
+	_props.build_props(arena_data)
 
 func _build_ground() -> void:
 	_ground_node = Node3D.new()
@@ -92,6 +100,20 @@ func _build_ground() -> void:
 	var half_w := arena_data.get_half_width()
 	var depth := arena_data.arena_depth
 	var gap_half := arena_data.gap_width / 2.0
+
+	# Outer green grass plane — extends well beyond the arena
+	var outer_ground := MeshInstance3D.new()
+	var outer_mesh := BoxMesh.new()
+	outer_mesh.size = Vector3(arena_data.arena_width + 60, 1, arena_data.arena_depth + 60)
+	outer_ground.mesh = outer_mesh
+	outer_ground.position = Vector3(0, -0.55, 0)
+	var outer_mat := StandardMaterial3D.new()
+	outer_mat.albedo_color = arena_data.ground_color
+	outer_mat.roughness = 0.85
+	outer_mat.metallic = 0.0
+	outer_ground.material_override = outer_mat
+	outer_ground.name = "OuterGround"
+	_ground_node.add_child(outer_ground)
 
 	# Team A ground (left side)
 	var ground_a := _create_ground_body(
@@ -111,49 +133,50 @@ func _build_ground() -> void:
 
 func _build_gap_visual() -> void:
 	var gap_node := Node3D.new()
-	gap_node.name = "GapVisual"
+	gap_node.name = "River"
 	add_child(gap_node)
 
-	# Deep pit underneath
-	var pit := MeshInstance3D.new()
-	var pit_box := BoxMesh.new()
-	pit_box.size = Vector3(arena_data.gap_width, 4, arena_data.arena_depth)
-	pit.mesh = pit_box
-	pit.position = Vector3(0, -2.5, 0)
-	var pit_mat := StandardMaterial3D.new()
-	pit_mat.albedo_color = Color(0.02, 0.02, 0.06)
-	pit_mat.roughness = 1.0
-	pit.material_override = pit_mat
-	gap_node.add_child(pit)
+	# River bed (dark bottom underneath the water)
+	var river_bed := MeshInstance3D.new()
+	var bed_mesh := BoxMesh.new()
+	bed_mesh.size = Vector3(arena_data.gap_width, 1, arena_data.arena_depth + 4)
+	river_bed.mesh = bed_mesh
+	river_bed.position = Vector3(0, -1.0, 0)
+	var bed_mat := StandardMaterial3D.new()
+	bed_mat.albedo_color = Color(0.08, 0.12, 0.06)
+	bed_mat.roughness = 0.9
+	river_bed.material_override = bed_mat
+	gap_node.add_child(river_bed)
 
-	# Glowing lava/energy surface at the bottom
-	var lava := MeshInstance3D.new()
-	var lava_mesh := BoxMesh.new()
-	lava_mesh.size = Vector3(arena_data.gap_width - 0.4, 0.1, arena_data.arena_depth - 0.4)
-	lava.mesh = lava_mesh
-	lava.position = Vector3(0, -3.5, 0)
-	var lava_mat := StandardMaterial3D.new()
-	lava_mat.albedo_color = Color(arena_data.gap_color.r * 2, arena_data.gap_color.g * 1.5, arena_data.gap_color.b * 2)
-	lava_mat.emission_enabled = true
-	lava_mat.emission = Color(arena_data.gap_color.r * 3, arena_data.gap_color.g * 2, arena_data.gap_color.b * 3)
-	lava_mat.emission_energy_multiplier = 2.5
-	lava_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	lava.material_override = lava_mat
-	gap_node.add_child(lava)
+	# Water surface — semi-transparent blue with subtle glow
+	var water := MeshInstance3D.new()
+	var water_mesh := BoxMesh.new()
+	water_mesh.size = Vector3(arena_data.gap_width, 0.15, arena_data.arena_depth + 4)
+	water.mesh = water_mesh
+	water.position = Vector3(0, -0.2, 0)
+	var water_mat := StandardMaterial3D.new()
+	water_mat.albedo_color = Color(0.1, 0.35, 0.55, 0.75)
+	water_mat.roughness = 0.05
+	water_mat.metallic = 0.3
+	water_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	water_mat.emission_enabled = true
+	water_mat.emission = Color(0.05, 0.15, 0.25)
+	water_mat.emission_energy_multiplier = 0.3
+	water.material_override = water_mat
+	gap_node.add_child(water)
 
-	# Edge lips on both sides of gap (stone edges)
+	# Dirt/earth banks on both sides of the river
 	for side in [-1.0, 1.0]:
-		var edge := MeshInstance3D.new()
-		var edge_mesh := BoxMesh.new()
-		edge_mesh.size = Vector3(0.3, 0.5, arena_data.arena_depth)
-		edge.mesh = edge_mesh
-		edge.position = Vector3(side * (arena_data.gap_width / 2.0 - 0.15), -0.25, 0)
-		var edge_mat := StandardMaterial3D.new()
-		edge_mat.albedo_color = Color(0.2, 0.2, 0.25)
-		edge_mat.roughness = 0.5
-		edge_mat.metallic = 0.3
-		edge.material_override = edge_mat
-		gap_node.add_child(edge)
+		var bank := MeshInstance3D.new()
+		var bank_mesh := BoxMesh.new()
+		bank_mesh.size = Vector3(0.6, 0.6, arena_data.arena_depth + 4)
+		bank.mesh = bank_mesh
+		bank.position = Vector3(side * (arena_data.gap_width / 2.0 - 0.1), -0.3, 0)
+		var bank_mat := StandardMaterial3D.new()
+		bank_mat.albedo_color = Color(0.25, 0.2, 0.12)
+		bank_mat.roughness = 0.85
+		bank.material_override = bank_mat
+		gap_node.add_child(bank)
 
 func _build_collision_walls() -> void:
 	_walls_node = Node3D.new()
@@ -174,47 +197,18 @@ func _build_collision_walls() -> void:
 		[Vector3(0, 1, bottom - 1), Vector3(full_width, 4, 2)],    # South
 		[Vector3(right + 1, 1, 0), Vector3(2, 4, full_depth)],     # East
 		[Vector3(left - 1, 1, 0), Vector3(2, 4, full_depth)],      # West
-		# Gap edges — block player movement across the gap
-		[Vector3(-gap_half, 1, 0), Vector3(0.5, 4, full_depth)],   # Left gap wall
-		[Vector3(gap_half, 1, 0), Vector3(0.5, 4, full_depth)],    # Right gap wall
 	]
-
-	var wall_mat := StandardMaterial3D.new()
-	wall_mat.albedo_color = Color(0.22, 0.2, 0.28)
-	wall_mat.roughness = 0.6
-	wall_mat.metallic = 0.15
 
 	for wall_info: Array in walls:
 		var wall_pos: Vector3 = wall_info[0]
 		var wall_size: Vector3 = wall_info[1]
+		# Invisible collision only — no visible mesh
 		var wall := StaticBody3D.new()
 		var shape := CollisionShape3D.new()
 		var box := BoxShape3D.new()
 		box.size = wall_size
 		shape.shape = box
 		wall.add_child(shape)
-
-		# Visible wall mesh
-		var wall_mesh := MeshInstance3D.new()
-		var wall_box := BoxMesh.new()
-		wall_box.size = wall_size
-		wall_mesh.mesh = wall_box
-		wall_mesh.material_override = wall_mat
-		wall.add_child(wall_mesh)
-
-		# Top edge highlight
-		var top_trim := MeshInstance3D.new()
-		var top_mesh := BoxMesh.new()
-		top_mesh.size = Vector3(wall_size.x + 0.1, 0.1, wall_size.z + 0.1)
-		top_trim.mesh = top_mesh
-		top_trim.position = Vector3(0, wall_size.y / 2.0, 0)
-		var top_mat := StandardMaterial3D.new()
-		top_mat.albedo_color = Color(0.35, 0.32, 0.42)
-		top_mat.roughness = 0.4
-		top_mat.metallic = 0.3
-		top_trim.material_override = top_mat
-		wall.add_child(top_trim)
-
 		_walls_node.add_child(wall)
 		wall.global_position = wall_pos
 
@@ -269,35 +263,7 @@ func _create_ground_body(pos: Vector3, box_size: Vector3) -> StaticBody3D:
 	trim.material_override = trim_mat
 	body.add_child(trim)
 
-	# Scatter small grass tufts on the ground surface
-	_add_grass_patches(body, box_size)
-
 	return body
-
-func _add_grass_patches(parent: Node3D, area_size: Vector3) -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = hash(parent.name)
-	var count := int(area_size.x * area_size.z * 0.03)  # Density
-	for i in range(count):
-		var x := rng.randf_range(-area_size.x / 2.0 + 0.5, area_size.x / 2.0 - 0.5)
-		var z := rng.randf_range(-area_size.z / 2.0 + 0.5, area_size.z / 2.0 - 0.5)
-		var tuft := MeshInstance3D.new()
-		var cone := CylinderMesh.new()
-		cone.top_radius = 0.0
-		cone.bottom_radius = rng.randf_range(0.15, 0.3)
-		cone.height = rng.randf_range(0.2, 0.45)
-		tuft.mesh = cone
-		tuft.position = Vector3(x, area_size.y / 2.0 + cone.height / 2.0, z)
-		var grass_mat := StandardMaterial3D.new()
-		var green_var := rng.randf_range(-0.05, 0.05)
-		grass_mat.albedo_color = Color(
-			arena_data.ground_color.r + green_var,
-			arena_data.ground_color.g + 0.15 + green_var,
-			arena_data.ground_color.b + green_var
-		)
-		grass_mat.roughness = 0.9
-		tuft.material_override = grass_mat
-		parent.add_child(tuft)
 
 func _create_hazard_disc(pos: Vector3, radius: float, color: Color) -> MeshInstance3D:
 	# Raised hazard platform with glowing emission
