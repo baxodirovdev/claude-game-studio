@@ -48,9 +48,13 @@ func _create_world_environment() -> void:
 	env.glow_hdr_threshold = 0.8
 
 	# --- SSAO --- depth perception
+	# Kept very subtle: radius 2m + intensity 1.5 was darkening every concave
+	# edge in the arena (bank-water cliffs, tile seams, prop bases) into hard
+	# black lines. Small radius + low intensity preserves depth cues on
+	# clustered props without staining flat surfaces.
 	env.ssao_enabled = true
-	env.ssao_radius = 2.0
-	env.ssao_intensity = 1.5
+	env.ssao_radius = 0.25
+	env.ssao_intensity = 0.35
 
 	# --- Fog --- atmospheric depth
 	env.fog_enabled = true

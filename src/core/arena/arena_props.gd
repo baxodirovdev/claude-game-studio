@@ -23,6 +23,7 @@ func build_props(arena_data: ArenaData, seed_value: int = 42) -> void:
 	_place_edge_props(arena_data)
 	_place_interior_scatter(arena_data)
 	_place_interior_trees(arena_data)
+	_place_river_bank_props(arena_data)
 
 func _load_prop_scenes() -> void:
 	var entries := {
@@ -62,6 +63,8 @@ func _load_prop_scenes() -> void:
 		"wood": MODELS_PATH + "resource-wood.glb",
 		"anvil": MODELS_PATH + "workbench-anvil.glb",
 	}
+	# River pieces are loaded directly in _place_river_bank_props from
+	# the procedurally generated kit — not via this cache.
 	for key: String in entries:
 		var path: String = entries[key]
 		if ResourceLoader.exists(path):
@@ -81,7 +84,7 @@ func _place_outer_scenery(arena_data: ArenaData) -> void:
 
 	var tree_types: Array[String] = ["tree", "tree_tall", "tree_autumn", "tree_autumn_tall"]
 	var rock_types: Array[String] = ["rock_a", "rock_b", "rock_c", "rock_flat", "rock_flat_grass"]
-	var detail_types: Array[String] = ["tree_log", "tree_log", "tree_trunk", "grass_large", "patch_grass_large", "wood", "planks"]
+	var detail_types: Array[String] = ["tree_log", "tree_log", "tree_trunk", "wood", "planks"]
 
 	# Scatter trees outside — left side only, mirrored to right
 	var tree_count := 40  # Half count since each is mirrored
@@ -293,7 +296,6 @@ func _place_interior_scatter(arena_data: ArenaData) -> void:
 	var gap_half := arena_data.gap_width / 2.0
 
 	var rock_props: Array[String] = ["rock_a", "rock_b", "rock_c", "rock_flat", "rock_flat_grass"]
-	var grass_props: Array[String] = ["grass", "grass_large", "patch_grass", "patch_grass_large"]
 
 	# Scatter rocks — left side only, mirrored (half count)
 	var rock_count := 20
@@ -311,18 +313,10 @@ func _place_interior_scatter(arena_data: ArenaData) -> void:
 		var s := _rng.randf_range(1.0, 1.8)
 		_place_mirrored(scatter_node, prop_key, Vector3(x, 0, z), rot, s)
 
-	# Scatter grass patches — left side only, mirrored (half count)
-	var grass_count := 38
-	for i in range(grass_count):
-		var x := _rng.randf_range(left + 2.0, -gap_half - 0.5)
-		var z := _rng.randf_range(bottom + 2.0, top - 2.0)
-
-		var prop_key: String = grass_props[_rng.randi_range(0, grass_props.size() - 1)]
-		if not _prop_scenes.has(prop_key):
-			continue
-		var rot := _rng.randf_range(0, TAU)
-		var s := _rng.randf_range(1.2, 2.0)
-		_place_mirrored(scatter_node, prop_key, Vector3(x, 0, z), rot, s)
+	# Grass-tuft scatter removed — the Kenney grass props (grass, grass_large,
+	# patch_grass, patch_grass_large) are flat-ish meshes that read as dark
+	# patches from a top-down camera and were visually noisy on the unshaded
+	# arena ground. Re-enable later if desired with a different prop set.
 
 ## Place trees inside the playable arena — left side only, mirrored to right.
 ## Avoids spawn points and gap zone.
@@ -378,6 +372,181 @@ func _place_mirrored(parent: Node3D, key: String, pos: Vector3, rot_y: float, sc
 	right.scale = Vector3(scl, scl, scl)
 	parent.add_child(right)
 	return true
+
+## Fills the arena gap with a procedurally generated Kenney-style river
+## composed of 2m tiles from `src/assets/models/environment/generated/`.
+##
+## Composition (fits the 6m gap exactly):
+##   LEFT column  at X=-2 → river_bank_sand rotated -90° (sandy bank, Team A side)
+##   CENTER col   at X= 0 → river_water (all water) with river_source rock
+##                          clusters at the north and south ends
+##   RIGHT column at X=+2 → river_bank_sand rotated +90° (sandy bank, Team B side)
+##
+## Extra polish on top of the base composition:
+##   - bank columns have a seeded ±6 cm X-jitter per row so the shoreline
+##     doesn't read as a perfect ruler-straight line
+##   - small rocks scatter on the water surface (every few rows) and on the
+##     sand banks for silhouette variety
+##
+## The banks themselves are spawned as TWO continuous slab meshes (one per
+## side) rather than 22 per-tile GLB instances. Per-tile banks produced
+## short dark dashes at every 2m boundary because SSAO darkens the
+## coplanar edges where adjacent tiles meet. A single long slab has no
+## internal seams and renders as a clean uninterrupted shore.
+##
+## A single seamless water plane is laid on top of the per-tile water
+## surfaces (5.2m wide so its X edges are buried inside the bank slab —
+## not coplanar with the slab's inner face). Shadow casting is disabled
+## on every river piece so bank edges don't project dark lines onto water.
+##
+## Tiles sit at Y=-0.2 so bank tops align with arena ground (Y=0).
+func _place_river_bank_props(arena_data: ArenaData) -> void:
+	const GEN_PATH := "res://assets/models/environment/generated/"
+	const TILE_SIZE := 2.0
+	const Y_OFFSET := -0.2
+	const EXTENSION_TILES := 1
+	const WATER_ROCK_EVERY := 5
+	const BANK_SLAB_HEIGHT := 0.2  # matches GROUND_H in primitives.py
+	# Bank shifted 1cm OUTWARD so its outer edge sits 1cm inside the arena
+	# ground footprint (overlap rather than touch). The bank GLB has a
+	# sand→grass vertex gradient, so the overlap region renders grass-on-
+	# grass and any sub-millimeter precision gap from the GLB rotation is
+	# bridged. Combined with the unshaded material override below this
+	# eliminates the dark line at the bank-grass border.
+	const BANK_OVERLAP := 0.01
+	const BANK_TILE_CENTER_X := 2.0 + BANK_OVERLAP
+	const BANK_SLAB_CENTER_X := 2.7 + BANK_OVERLAP
+
+	var water_scene: PackedScene = load(GEN_PATH + "river_water.glb")
+	var source_scene: PackedScene = load(GEN_PATH + "river_source.glb")
+	var rock_scene: PackedScene = load(GEN_PATH + "rock.glb")
+	var bank_scene: PackedScene = load(GEN_PATH + "river_bank_rock.glb")
+	if water_scene == null or bank_scene == null:
+		push_warning("Arena river: missing river_water.glb / river_bank_rock.glb"
+			+ " in " + GEN_PATH + " — run /kenney-gen to produce them.")
+		return
+
+	# Banks use the GLB's default shaded material so the beveled top edges
+	# read as 3D (chamfer faces shade slightly differently from the flat
+	# top under directional light).
+
+	var river_node := Node3D.new()
+	river_node.name = "RiverProps"
+	add_child(river_node)
+
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20260424
+
+	var top_z := arena_data.get_top_boundary() + TILE_SIZE * EXTENSION_TILES
+	var bottom_z := arena_data.get_bottom_boundary() - TILE_SIZE * EXTENSION_TILES
+
+	var z_positions: Array[float] = []
+	var z := bottom_z + TILE_SIZE / 2.0
+	while z <= top_z - TILE_SIZE / 2.0 + 0.01:
+		z_positions.append(z)
+		z += TILE_SIZE
+
+	var n_rows := z_positions.size()
+	var bank_top_y: float = Y_OFFSET + BANK_SLAB_HEIGHT  # bank top surface (Y=0)
+	# Water sits 2cm below bank top.
+	var water_surface_y: float = bank_top_y - 0.02
+	var rock_base_y: float = water_surface_y + 0.001  # sit on the big water plane
+
+	# Per-row iteration: a center water/source tile + a sand bank tile per
+	# side + in-water rock scatter + on-bank pebble scatter. Banks use
+	# river_bank_sand directly (the per-tile beveled GLB).
+	for i in n_rows:
+		var z_pos: float = z_positions[i]
+
+		var center: Node3D
+		if i == 0 and source_scene != null:
+			center = source_scene.instantiate()
+			center.rotation.y = PI / 2.0
+		elif i == n_rows - 1 and source_scene != null:
+			center = source_scene.instantiate()
+			center.rotation.y = -PI / 2.0
+		else:
+			center = water_scene.instantiate()
+		center.position = Vector3(0.0, Y_OFFSET, z_pos)
+		river_node.add_child(center)
+
+		# Bank tiles — one per side, rotated so the bank face is on the
+		# outer (grass) edge. Default GLB material (shaded) so bevel
+		# chamfers read as 3D under directional light.
+		for side_sign: int in [-1, 1]:
+			var bank: Node3D = bank_scene.instantiate()
+			bank.position = Vector3(
+				float(side_sign) * BANK_TILE_CENTER_X, Y_OFFSET, z_pos
+			)
+			bank.rotation.y = float(side_sign) * PI / 2.0
+			bank.name = "Bank" + ("R" if side_sign > 0 else "L") + str(i)
+			river_node.add_child(bank)
+
+		# A — scatter 1-2 rocks on water every few rows (skip source endpoints)
+		if rock_scene != null and i != 0 and i != n_rows - 1 \
+				and (i % WATER_ROCK_EVERY) == (WATER_ROCK_EVERY / 2):
+			var rock_count := rng.randi_range(1, 2)
+			for r in rock_count:
+				var r_inst: Node3D = rock_scene.instantiate()
+				var r_scale := rng.randf_range(0.45, 0.85)
+				r_inst.scale = Vector3(r_scale, r_scale, r_scale)
+				r_inst.position = Vector3(
+					rng.randf_range(-1.0, 1.0),
+					rock_base_y,
+					z_pos + rng.randf_range(-0.5, 0.5),
+				)
+				r_inst.rotation.y = rng.randf_range(0.0, TAU)
+				river_node.add_child(r_inst)
+
+		# (Rock-pile-on-bank scatter removed — the bank slab itself now has a
+		# full 3D bevel profile so it doesn't need extra rocks for shape.)
+
+	# Lay a single seamless water plane over the per-tile water surfaces.
+	# It is deliberately wider than the visible channel (5.2m vs 4.8m) so the
+	# plane's X edges are buried INSIDE the bank geometry rather than meeting
+	# the bank inner face at a coplanar edge — coplanar shared edges would
+	# otherwise trigger SSAO darkening and render as thin dark lines.
+	# The Z edges are hidden at the north/south outer-ground boundary.
+	var seamless_len: float = (top_z - bottom_z) + 0.6
+	var seamless := MeshInstance3D.new()
+	var seamless_mesh := BoxMesh.new()
+	seamless_mesh.size = Vector3(5.2, 0.04, seamless_len)
+	seamless.mesh = seamless_mesh
+	seamless.position = Vector3(
+		0.0,
+		water_surface_y + 0.001 - 0.02,  # top surface 1 mm above tile water
+		0.0,
+	)
+	var water_mat := StandardMaterial3D.new()
+	water_mat.albedo_color = Color(0.15, 0.42, 0.88)
+	water_mat.roughness = 0.85
+	seamless.material_override = water_mat
+	seamless.name = "SeamlessWater"
+	river_node.add_child(seamless)
+
+	# Kill cast_shadow on every spawned river piece so bank edges don't
+	# project thin dark shadow seams onto the water surface.
+	_disable_cast_shadow_recursive(river_node)
+
+
+## Walks the subtree and sets cast_shadow OFF on every GeometryInstance3D.
+## Used after spawning river tiles so they don't cast shadows onto the
+## adjacent water — which would otherwise appear as long dark seams.
+func _disable_cast_shadow_recursive(node: Node) -> void:
+	if node is GeometryInstance3D:
+		(node as GeometryInstance3D).cast_shadow = \
+			GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	for child in node.get_children():
+		_disable_cast_shadow_recursive(child)
+
+
+## Walks the subtree and sets `material_override` on every MeshInstance3D.
+## Used to force the bank to unshaded vertex-color rendering.
+func _apply_material_recursive(node: Node, mat: Material) -> void:
+	if node is MeshInstance3D:
+		(node as MeshInstance3D).material_override = mat
+	for child in node.get_children():
+		_apply_material_recursive(child, mat)
 
 ## Create a prop instance from a loaded scene.
 func _create_prop(key: String) -> Node3D:

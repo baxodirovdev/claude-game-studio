@@ -1,66 +1,66 @@
-[gd_scene load_steps=26 format=3]
+[gd_scene format=3 uid="uid://cgi6jibguxsl0"]
 
-[ext_resource type="Script" path="res://main.gd" id="1"]
+[ext_resource type="Script" uid="uid://cc83kuaa3xce4" path="res://main.gd" id="1"]
 [ext_resource type="PackedScene" path="res://core/input/input_manager.tscn" id="2"]
-[ext_resource type="Script" path="res://core/arena/arena.gd" id="3"]
-[ext_resource type="Script" path="res://core/camera/game_camera.gd" id="5"]
-[ext_resource type="Script" path="res://gameplay/player/player_controller.gd" id="6"]
-[ext_resource type="Script" path="res://gameplay/hook/hook_system.gd" id="7"]
-[ext_resource type="Script" path="res://gameplay/health/health_component.gd" id="8"]
-[ext_resource type="Script" path="res://gameplay/match/match_state_manager.gd" id="9"]
-[ext_resource type="Script" path="res://gameplay/respawn/respawn_system.gd" id="10"]
+[ext_resource type="Script" uid="uid://biqooc754vaep" path="res://core/arena/arena.gd" id="3"]
+[ext_resource type="Script" uid="uid://65efqq2h56nv" path="res://core/camera/game_camera.gd" id="5"]
+[ext_resource type="Script" uid="uid://cgnesypfm8nnu" path="res://gameplay/player/player_controller.gd" id="6"]
+[ext_resource type="Script" uid="uid://cgtfuar2gpcij" path="res://gameplay/hook/hook_system.gd" id="7"]
+[ext_resource type="Script" uid="uid://b4e6f7k25ndoo" path="res://gameplay/health/health_component.gd" id="8"]
+[ext_resource type="Script" uid="uid://cyqyuwuf6ok8a" path="res://gameplay/match/match_state_manager.gd" id="9"]
+[ext_resource type="Script" uid="uid://bgaq6dhmdaifg" path="res://gameplay/respawn/respawn_system.gd" id="10"]
 [ext_resource type="Resource" path="res://data/heroes/pudge.tres" id="11"]
 [ext_resource type="Resource" path="res://data/config/default_match.tres" id="12"]
 [ext_resource type="PackedScene" path="res://ui/hud/game_hud.tscn" id="13"]
-[ext_resource type="Script" path="res://gameplay/hazards/hazard_system.gd" id="14"]
-[ext_resource type="Script" path="res://gameplay/score/score_system.gd" id="15"]
-[ext_resource type="Script" path="res://gameplay/hero/hero_level_system.gd" id="16"]
+[ext_resource type="Script" uid="uid://iq10n0h8ixwd" path="res://gameplay/hazards/hazard_system.gd" id="14"]
+[ext_resource type="Script" uid="uid://dle8vwyreyd5x" path="res://gameplay/score/score_system.gd" id="15"]
+[ext_resource type="Script" uid="uid://drqyvqlt0tene" path="res://gameplay/hero/hero_level_system.gd" id="16"]
 [ext_resource type="PackedScene" path="res://ui/hero_select/hero_select.tscn" id="17"]
-[ext_resource type="Script" path="res://ui/results/match_results.gd" id="18"]
-[ext_resource type="Script" path="res://gameplay/vfx/vfx_system.gd" id="19"]
-[ext_resource type="Script" path="res://gameplay/audio/audio_system.gd" id="20"]
-[ext_resource type="Script" path="res://gameplay/economy/gold_system.gd" id="21"]
-[ext_resource type="Script" path="res://ui/shop/item_shop.gd" id="22"]
-[ext_resource type="Script" path="res://data/profile/player_profile.gd" id="23"]
-[ext_resource type="Script" path="res://core/environment/game_environment.gd" id="24"]
+[ext_resource type="Script" uid="uid://d24e5b0cjb3sp" path="res://ui/results/match_results.gd" id="18"]
+[ext_resource type="Script" uid="uid://bfcssg7b1dysb" path="res://gameplay/vfx/vfx_system.gd" id="19"]
+[ext_resource type="Script" uid="uid://hf77obkj6sby" path="res://gameplay/audio/audio_system.gd" id="20"]
+[ext_resource type="Script" uid="uid://caefdittturqj" path="res://gameplay/economy/gold_system.gd" id="21"]
+[ext_resource type="Script" uid="uid://ca1pmmdyhy337" path="res://ui/shop/item_shop.gd" id="22"]
+[ext_resource type="Script" uid="uid://bfo18dmvdje02" path="res://data/profile/player_profile.gd" id="23"]
+[ext_resource type="Script" uid="uid://dbnvndvf6k2oc" path="res://core/environment/game_environment.gd" id="24"]
 
 [sub_resource type="CapsuleShape3D" id="1"]
-radius = 0.4
-height = 1.6
-
-[sub_resource type="CapsuleMesh" id="2"]
 radius = 0.4
 height = 1.6
 
 [sub_resource type="StandardMaterial3D" id="3"]
 albedo_color = Color(0.2, 0.6, 1, 1)
 
-[node name="Main" type="Node3D"]
+[sub_resource type="CapsuleMesh" id="2"]
+radius = 0.4
+height = 1.6
+
+[node name="Main" type="Node3D" unique_id=1875516852]
 script = ExtResource("1")
 hero_config = ExtResource("11")
 match_config = ExtResource("12")
 
-[node name="Arena" type="Node3D" parent="."]
+[node name="Arena" type="Node3D" parent="." unique_id=334811254]
 script = ExtResource("3")
 
-[node name="Player" type="CharacterBody3D" parent="."]
+[node name="Player" type="CharacterBody3D" parent="." unique_id=2070505670]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.8, 0)
 script = ExtResource("6")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Player" unique_id=590503606]
 shape = SubResource("1")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Player"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Player" unique_id=1992969850]
 material_override = SubResource("3")
 mesh = SubResource("2")
 
-[node name="HealthComponent" type="Node" parent="Player"]
+[node name="HealthComponent" type="Node" parent="Player" unique_id=436119079]
 script = ExtResource("8")
 
-[node name="HookSystem" type="Node" parent="Player"]
+[node name="HookSystem" type="Node" parent="Player" unique_id=1555265558]
 script = ExtResource("7")
 
-[node name="GameCamera" type="Camera3D" parent="."]
+[node name="GameCamera" type="Camera3D" parent="." unique_id=1384781310]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 25, 20)
 projection = 1
 size = 25.0
@@ -68,43 +68,43 @@ near = 0.1
 far = 100.0
 script = ExtResource("5")
 
-[node name="DirectionalLight" type="DirectionalLight3D" parent="."]
+[node name="DirectionalLight" type="DirectionalLight3D" parent="." unique_id=2021997958]
 transform = Transform3D(1, 0, 0, 0, 0.5, 0.866, 0, -0.866, 0.5, 0, 20, 0)
-light_color = Color(1.0, 0.95, 0.85, 1)
+light_color = Color(1, 0.95, 0.85, 1)
 light_energy = 1.2
 shadow_enabled = true
 shadow_bias = 0.05
 directional_shadow_max_distance = 60.0
 
-[node name="GameEnvironment" type="Node3D" parent="."]
+[node name="GameEnvironment" type="Node3D" parent="." unique_id=1857882141]
 script = ExtResource("24")
 
-[node name="InputManager" parent="." instance=ExtResource("2")]
+[node name="InputManager" parent="." unique_id=1154398777 instance=ExtResource("2")]
 
-[node name="MatchStateManager" type="Node" parent="."]
+[node name="MatchStateManager" type="Node" parent="." unique_id=2111867925]
 script = ExtResource("9")
 
-[node name="RespawnSystem" type="Node" parent="."]
+[node name="RespawnSystem" type="Node" parent="." unique_id=1179506552]
 script = ExtResource("10")
 
-[node name="HazardSystem" type="Node" parent="."]
+[node name="HazardSystem" type="Node" parent="." unique_id=387037697]
 script = ExtResource("14")
 
-[node name="ScoreSystem" type="Node" parent="."]
+[node name="ScoreSystem" type="Node" parent="." unique_id=1754704488]
 script = ExtResource("15")
 
-[node name="HeroLevelSystem" type="Node" parent="."]
+[node name="HeroLevelSystem" type="Node" parent="." unique_id=1743811402]
 script = ExtResource("16")
 
-[node name="GameHUD" parent="." instance=ExtResource("13")]
+[node name="GameHUD" parent="." unique_id=398682913 instance=ExtResource("13")]
 
-[node name="HeroSelect" parent="." instance=ExtResource("17")]
+[node name="HeroSelect" parent="." unique_id=1992300526 instance=ExtResource("17")]
 
-[node name="MatchResults" type="CanvasLayer" parent="."]
+[node name="MatchResults" type="CanvasLayer" parent="." unique_id=1327556561]
 layer = 30
 script = ExtResource("18")
 
-[node name="Panel" type="PanelContainer" parent="MatchResults"]
+[node name="Panel" type="PanelContainer" parent="MatchResults" unique_id=1860288540]
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
@@ -115,47 +115,47 @@ offset_top = -250.0
 offset_right = 200.0
 offset_bottom = 250.0
 
-[node name="VBox" type="VBoxContainer" parent="MatchResults/Panel"]
+[node name="VBox" type="VBoxContainer" parent="MatchResults/Panel" unique_id=1765292152]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="TitleLabel" type="Label" parent="MatchResults/Panel/VBox"]
+[node name="TitleLabel" type="Label" parent="MatchResults/Panel/VBox" unique_id=196949612]
 layout_mode = 2
-horizontal_alignment = 1
 theme_override_font_sizes/font_size = 36
+horizontal_alignment = 1
 
-[node name="StatsContainer" type="VBoxContainer" parent="MatchResults/Panel/VBox"]
+[node name="StatsContainer" type="VBoxContainer" parent="MatchResults/Panel/VBox" unique_id=1716418248]
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="MVPLabel" type="Label" parent="MatchResults/Panel/VBox"]
+[node name="MVPLabel" type="Label" parent="MatchResults/Panel/VBox" unique_id=570274138]
 layout_mode = 2
 horizontal_alignment = 1
 
-[node name="PlayAgainButton" type="Button" parent="MatchResults/Panel/VBox"]
-layout_mode = 2
+[node name="PlayAgainButton" type="Button" parent="MatchResults/Panel/VBox" unique_id=1310284458]
 custom_minimum_size = Vector2(0, 40)
-text = "PLAY AGAIN"
-theme_override_font_sizes/font_size = 18
-
-[node name="MenuButton" type="Button" parent="MatchResults/Panel/VBox"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 36)
-text = "RETURN TO MENU"
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 18
+text = "PLAY AGAIN"
 
-[node name="VFXSystem" type="Node3D" parent="."]
+[node name="MenuButton" type="Button" parent="MatchResults/Panel/VBox" unique_id=1726283223]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "RETURN TO MENU"
+
+[node name="VFXSystem" type="Node3D" parent="." unique_id=2066758827]
 script = ExtResource("19")
 
-[node name="AudioSystem" type="Node" parent="."]
+[node name="AudioSystem" type="Node" parent="." unique_id=171953341]
 script = ExtResource("20")
 
-[node name="GoldSystem" type="Node" parent="."]
+[node name="GoldSystem" type="Node" parent="." unique_id=153810723]
 script = ExtResource("21")
 
-[node name="ItemShop" type="CanvasLayer" parent="."]
+[node name="ItemShop" type="CanvasLayer" parent="." unique_id=1331206540]
 layer = 25
 script = ExtResource("22")
 
-[node name="PlayerProfile" type="Node" parent="."]
+[node name="PlayerProfile" type="Node" parent="." unique_id=644193265]
 script = ExtResource("23")

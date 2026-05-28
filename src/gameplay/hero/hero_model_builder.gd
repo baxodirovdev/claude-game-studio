@@ -3,8 +3,45 @@
 ## Each hero gets a distinct silhouette built from Godot mesh primitives.
 ## Models are purely visual — collision uses the existing CapsuleShape3D.
 ## Called by Main when creating player meshes.
+##
+## OVERRIDE WITH A PRE-MADE GLB:
+## Drop a model at `res://assets/models/heroes/<hero_id>.glb` and this
+## builder will use it instead of the primitive composition. Falls back to
+## the primitive builder when the GLB is missing, so you can adopt
+## pre-made models hero-by-hero without breaking anything.
 class_name HeroModelBuilder
 extends RefCounted
+
+const HERO_GLB_PATH := "res://assets/models/heroes/%s.glb"
+const HERO_HOOK_GLB_PATH := "res://assets/models/heroes/%s_hook.glb"
+const HERO_BODY_TINT_SHADER := "res://assets/shaders/hero_body_tint.gdshader"
+
+# Socket spec (brief §6). Position is the rest-pose local offset for the
+# pre-rig fallback (Marker3D); after Mixamo lands, the rig path replaces
+# these with BoneAttachment3D using the bone names below.
+# Mixamo standard skeleton uses `mixamorig:` prefix.
+const HERO_SOCKETS := {
+	"socket_hook_hand": {
+		"position": Vector3(-0.84, 0.50, -0.10),
+		"bone": "mixamorig:LeftHand",
+	},
+	"socket_offhand": {
+		"position": Vector3(0.84, 0.50, -0.10),
+		"bone": "mixamorig:RightHand",
+	},
+	"socket_chain_origin": {
+		"position": Vector3(0.0, 1.16, 0.0),
+		"bone": "mixamorig:Spine2",
+	},
+	"socket_hit_center": {
+		"position": Vector3(0.0, 0.96, -0.22),
+		"bone": "mixamorig:Spine1",
+	},
+	"socket_head_top": {
+		"position": Vector3(0.0, 1.88, 0.0),
+		"bone": "mixamorig:Head",
+	},
+}
 
 ## Build a hero model and attach it to the given parent node.
 ## Replaces the default MeshInstance3D with a multi-mesh character.
@@ -13,6 +50,22 @@ static func build_model(parent: Node3D, hero_config: HeroConfig) -> void:
 	var old_mesh := parent.get_node_or_null("MeshInstance3D")
 	if old_mesh:
 		old_mesh.queue_free()
+
+	# If a pre-made GLB exists for this hero, use it and skip the primitive
+	# builder entirely. Pre-made models are expected to have feet at Y=0
+	# and forward = -Z (Godot default), matching the player capsule.
+	var glb_path: String = HERO_GLB_PATH % hero_config.hero_id
+	if ResourceLoader.exists(glb_path):
+		var scene: PackedScene = load(glb_path)
+		if scene != null:
+			var glb_root: Node3D = scene.instantiate()
+			if glb_root != null:
+				glb_root.name = "MeshInstance3D"
+				parent.add_child(glb_root)
+				_apply_hero_tint(glb_root, hero_config.hero_color)
+				_setup_hero_sockets(glb_root, hero_config.hero_id)
+				_attach_hook_prop(glb_root, hero_config.hero_id)
+				return
 
 	var model := Node3D.new()
 	model.name = "MeshInstance3D"  # Keep same name for compatibility
@@ -323,3 +376,110 @@ static func _mesh(mesh_res: Mesh, mat: StandardMaterial3D) -> MeshInstance3D:
 	mi.mesh = mesh_res
 	mi.material_override = mat
 	return mi
+
+
+## --- GLB integration helpers (Stage 8 partial — pre-Mixamo) ---
+
+## Walk the imported GLB scene and override every MeshInstance3D's material
+## with the hero body tint shader. The tint shader keeps non-skin vertex
+## colors intact and tints only the skin band (yellow-green hue range)
+## using the hero's per-team color. Once the textured PBR pass lands, this
+## function will additionally bind the BaseColor / Normal / ORM / Emissive /
+## TintMask textures from `design/gdd/materials/pudge.md`.
+static func _apply_hero_tint(root: Node3D, tint_color: Color) -> void:
+	var shader := load(HERO_BODY_TINT_SHADER) as Shader
+	if shader == null:
+		push_warning("HeroModelBuilder: tint shader missing at %s" % HERO_BODY_TINT_SHADER)
+		return
+	var mat := ShaderMaterial.new()
+	mat.shader = shader
+	mat.set_shader_parameter("tint_color", tint_color)
+	mat.set_shader_parameter("tint_strength", 1.0)
+	for n in _all_descendants(root):
+		if n is MeshInstance3D:
+			(n as MeshInstance3D).material_override = mat
+
+
+## Add 5 socket nodes (brief §6) under the imported GLB.
+##
+## If the import contains a Skeleton3D (Mixamo-rigged path), each socket
+## becomes a `BoneAttachment3D` bound to the bone listed in `HERO_SOCKETS`.
+## If there is no skeleton (current pre-Mixamo state), each socket is a
+## `Marker3D` placed at the rest-pose offset — gameplay code can already
+## query these by name; they will silently start tracking bones once the
+## rigged GLB lands and replaces the placeholders.
+static func _setup_hero_sockets(root: Node3D, hero_id: String) -> void:
+	var skeleton: Skeleton3D = _find_first_skeleton(root)
+	for socket_name in HERO_SOCKETS.keys():
+		var spec: Dictionary = HERO_SOCKETS[socket_name]
+		var node: Node3D
+		if skeleton != null:
+			var bone_idx: int = skeleton.find_bone(spec["bone"])
+			if bone_idx == -1:
+				push_warning("HeroModelBuilder[%s]: bone %s not found, falling back to Marker3D" % [hero_id, spec["bone"]])
+				node = Marker3D.new()
+				node.position = spec["position"]
+			else:
+				var ba := BoneAttachment3D.new()
+				ba.bone_idx = bone_idx
+				ba.bone_name = spec["bone"]
+				node = ba
+				skeleton.add_child(ba)
+				ba.name = socket_name
+				continue
+		else:
+			node = Marker3D.new()
+			node.position = spec["position"]
+		node.name = socket_name
+		root.add_child(node)
+
+
+## Load the hero's separate hook prop GLB (if present) and parent it to the
+## hook-hand socket. Called only on the rigged path — without bones the
+## socket is a static Marker3D and the prop just hangs at the rest position.
+static func _attach_hook_prop(root: Node3D, hero_id: String) -> void:
+	var hook_path: String = HERO_HOOK_GLB_PATH % hero_id
+	if not ResourceLoader.exists(hook_path):
+		return
+	var hook_socket: Node = root.get_node_or_null("socket_hook_hand")
+	if hook_socket == null:
+		# Fall back: the rig path attached socket under skeleton, search for it.
+		hook_socket = _find_node_named(root, "socket_hook_hand")
+	if hook_socket == null:
+		return
+	var hook_scene: PackedScene = load(hook_path)
+	if hook_scene == null:
+		return
+	var hook_inst: Node = hook_scene.instantiate()
+	if hook_inst == null:
+		return
+	hook_inst.name = "hook_prop"
+	hook_socket.add_child(hook_inst)
+
+
+static func _all_descendants(node: Node) -> Array:
+	var out: Array = []
+	for child in node.get_children():
+		out.append(child)
+		out.append_array(_all_descendants(child))
+	return out
+
+
+static func _find_first_skeleton(node: Node) -> Skeleton3D:
+	if node is Skeleton3D:
+		return node
+	for child in node.get_children():
+		var found := _find_first_skeleton(child)
+		if found != null:
+			return found
+	return null
+
+
+static func _find_node_named(node: Node, target: String) -> Node:
+	if node.name == target:
+		return node
+	for child in node.get_children():
+		var found := _find_node_named(child, target)
+		if found != null:
+			return found
+	return null

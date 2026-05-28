@@ -101,19 +101,31 @@ func _build_ground() -> void:
 	var depth := arena_data.arena_depth
 	var gap_half := arena_data.gap_width / 2.0
 
-	# Outer green grass plane — extends well beyond the arena
-	var outer_ground := MeshInstance3D.new()
-	var outer_mesh := BoxMesh.new()
-	outer_mesh.size = Vector3(arena_data.arena_width + 60, 1, arena_data.arena_depth + 60)
-	outer_ground.mesh = outer_mesh
-	outer_ground.position = Vector3(0, -0.55, 0)
+	# Outer green grass plane — extends well beyond the arena on each side of
+	# the central gap. A single box would occlude the river water surface that
+	# sits in the gap, so we build left and right halves with a hole between.
+	# The outer plane is lowered ~0.5m below the arena ground top so the arena
+	# reads as a raised plateau with visible cliff faces at its boundary.
+	var outer_total_w := arena_data.arena_width + 60.0
+	var outer_depth := arena_data.arena_depth + 60.0
+	var outer_half_w := (outer_total_w - arena_data.gap_width) / 2.0
+	var outer_cx := arena_data.gap_width / 2.0 + outer_half_w / 2.0
+	var outer_top_y := -0.5  # was -0.05 (flush with arena); now 0.5m below
+
 	var outer_mat := StandardMaterial3D.new()
-	outer_mat.albedo_color = arena_data.ground_color
+	outer_mat.albedo_color = arena_data.ground_color.darkened(0.08)
 	outer_mat.roughness = 0.85
 	outer_mat.metallic = 0.0
-	outer_ground.material_override = outer_mat
-	outer_ground.name = "OuterGround"
-	_ground_node.add_child(outer_ground)
+
+	for side: int in [-1, 1]:
+		var outer := MeshInstance3D.new()
+		var outer_mesh := BoxMesh.new()
+		outer_mesh.size = Vector3(outer_half_w, 1, outer_depth)
+		outer.mesh = outer_mesh
+		outer.position = Vector3(float(side) * outer_cx, outer_top_y - 0.5, 0)
+		outer.material_override = outer_mat
+		outer.name = "OuterGround" + ("R" if side > 0 else "L")
+		_ground_node.add_child(outer)
 
 	# Team A ground (left side)
 	var ground_a := _create_ground_body(
@@ -132,51 +144,7 @@ func _build_ground() -> void:
 	_ground_node.add_child(ground_b)
 
 func _build_gap_visual() -> void:
-	var gap_node := Node3D.new()
-	gap_node.name = "River"
-	add_child(gap_node)
-
-	# River bed (dark bottom underneath the water)
-	var river_bed := MeshInstance3D.new()
-	var bed_mesh := BoxMesh.new()
-	bed_mesh.size = Vector3(arena_data.gap_width, 1, arena_data.arena_depth + 4)
-	river_bed.mesh = bed_mesh
-	river_bed.position = Vector3(0, -1.0, 0)
-	var bed_mat := StandardMaterial3D.new()
-	bed_mat.albedo_color = Color(0.08, 0.12, 0.06)
-	bed_mat.roughness = 0.9
-	river_bed.material_override = bed_mat
-	gap_node.add_child(river_bed)
-
-	# Water surface — semi-transparent blue with subtle glow
-	var water := MeshInstance3D.new()
-	var water_mesh := BoxMesh.new()
-	water_mesh.size = Vector3(arena_data.gap_width, 0.15, arena_data.arena_depth + 4)
-	water.mesh = water_mesh
-	water.position = Vector3(0, -0.2, 0)
-	var water_mat := StandardMaterial3D.new()
-	water_mat.albedo_color = Color(0.1, 0.35, 0.55, 0.75)
-	water_mat.roughness = 0.05
-	water_mat.metallic = 0.3
-	water_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	water_mat.emission_enabled = true
-	water_mat.emission = Color(0.05, 0.15, 0.25)
-	water_mat.emission_energy_multiplier = 0.3
-	water.material_override = water_mat
-	gap_node.add_child(water)
-
-	# Dirt/earth banks on both sides of the river
-	for side in [-1.0, 1.0]:
-		var bank := MeshInstance3D.new()
-		var bank_mesh := BoxMesh.new()
-		bank_mesh.size = Vector3(0.6, 0.6, arena_data.arena_depth + 4)
-		bank.mesh = bank_mesh
-		bank.position = Vector3(side * (arena_data.gap_width / 2.0 - 0.1), -0.3, 0)
-		var bank_mat := StandardMaterial3D.new()
-		bank_mat.albedo_color = Color(0.25, 0.2, 0.12)
-		bank_mat.roughness = 0.85
-		bank.material_override = bank_mat
-		gap_node.add_child(bank)
+	pass  # River visuals handled by Kenney assets in ArenaProps._place_river_bank_props
 
 func _build_collision_walls() -> void:
 	_walls_node = Node3D.new()
@@ -238,7 +206,11 @@ func _create_ground_body(pos: Vector3, box_size: Vector3) -> StaticBody3D:
 	shape.shape = box
 	body.add_child(shape)
 
-	# Main ground mesh with PBR material
+	# Main ground mesh — UNSHADED so its top renders as the pure
+	# ground_color regardless of lighting. The river bank GLB is also
+	# rendered unshaded with the same grass color on its outer edge, so
+	# the bank-grass border becomes a perfect color match (no visible
+	# brightness difference at the seam).
 	var mesh_inst := MeshInstance3D.new()
 	var mesh := BoxMesh.new()
 	mesh.size = box_size
@@ -247,21 +219,14 @@ func _create_ground_body(pos: Vector3, box_size: Vector3) -> StaticBody3D:
 	mat.albedo_color = arena_data.ground_color
 	mat.roughness = 0.85
 	mat.metallic = 0.0
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mesh_inst.material_override = mat
 	body.add_child(mesh_inst)
 
-	# Edge trim — raised border along the top surface
-	var trim := MeshInstance3D.new()
-	var trim_mesh := BoxMesh.new()
-	trim_mesh.size = Vector3(box_size.x + 0.2, 0.15, box_size.z + 0.2)
-	trim.mesh = trim_mesh
-	trim.position = Vector3(0, box_size.y / 2.0, 0)
-	var trim_mat := StandardMaterial3D.new()
-	trim_mat.albedo_color = arena_data.ground_color.darkened(0.3)
-	trim_mat.roughness = 0.6
-	trim_mat.metallic = 0.2
-	trim.material_override = trim_mat
-	body.add_child(trim)
+	# (Edge trim removed — was a darker-green raised border that extended
+	# 10cm beyond the ground on every side. On the gap-facing edge it
+	# protruded into the river/bank area as a dark stripe at the bank-grass
+	# border. The river banks now visually frame the gap edge instead.)
 
 	return body
 

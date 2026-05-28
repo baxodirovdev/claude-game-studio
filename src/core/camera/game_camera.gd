@@ -10,11 +10,11 @@ extends Camera3D
 ## Offset from target toward the gap (positive X = toward enemy side).
 @export var gap_offset: float = 5.0
 ## Camera offset from the follow point (determines view angle).
-@export var camera_offset: Vector3 = Vector3(0, 25, 20)
+@export var camera_offset: Vector3 = Vector3(0, 18, 14)
 ## Smoothing speed (higher = snappier).
 @export var follow_speed: float = 8.0
-## Orthographic view size.
-@export var view_size: float = 25.0
+## Perspective field of view (degrees).
+@export var camera_fov: float = 45.0
 
 var _fixed_rotation: Vector3 = Vector3.ZERO
 var _initialized: bool = false
@@ -22,8 +22,8 @@ var _shake_intensity: float = 0.0
 var _shake_decay: float = 5.0
 
 func _ready() -> void:
-	projection = Camera3D.PROJECTION_ORTHOGONAL
-	size = view_size
+	projection = Camera3D.PROJECTION_PERSPECTIVE
+	fov = camera_fov
 	near = 0.1
 	far = 100.0
 	# Point at the origin as a sane default until initialize() is called

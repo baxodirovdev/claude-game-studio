@@ -13,5 +13,5 @@ spike_zones = Array[Vector3]([Vector3(-4, 0, -8), Vector3(-4, 0, 8), Vector3(4, 
 spike_zone_radius = 3.0
 pit_zones = Array[Vector3]([Vector3(-10, 0, -10), Vector3(-10, 0, 10), Vector3(10, 0, -10), Vector3(10, 0, 10)])
 pit_radius = 2.0
-ground_color = Color(0.3, 0.5, 0.3, 1)
+ground_color = Color(0.40, 0.68, 0.26, 1)
 gap_color = Color(0.15, 0.15, 0.4, 1)

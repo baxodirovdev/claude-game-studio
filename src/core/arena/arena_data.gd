@@ -43,7 +43,7 @@ extends Resource
 
 @export_group("Visuals")
 ## Ground color for both halves.
-@export var ground_color: Color = Color(0.3, 0.5, 0.3, 1)
+@export var ground_color: Color = Color(0.40, 0.68, 0.26, 1)
 ## Gap color (void).
 @export var gap_color: Color = Color(0.15, 0.15, 0.4, 1)
 
