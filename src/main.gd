@@ -52,6 +52,7 @@ func _ready() -> void:
 
 	# Build hero 3D model
 	HeroModelBuilder.build_model(player, hero_config)
+	player.refresh_hero_animator()
 
 	# Wire hook system and apply hero config
 	hook_system.player = player
@@ -198,6 +199,7 @@ func _apply_hero_config(config: HeroConfig) -> void:
 
 	# Build hero 3D model
 	HeroModelBuilder.build_model(player, config)
+	player.refresh_hero_animator()
 
 	# Apply to hook system
 	hook_system.hook_speed = config.hook_speed

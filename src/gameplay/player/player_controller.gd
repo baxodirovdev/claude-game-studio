@@ -20,6 +20,17 @@ var team_id: int = 0
 ## Reference set by Main after scene is ready.
 var input_manager: InputManager
 
+## Drives the hero model's animations. Null until refresh_hero_animator() finds
+## an AnimationPlayer in the built model (primitive-fallback heroes have none).
+var _animator: HeroAnimator
+
+## (Re)bind the animator to the current hero model. Call after the model is
+## (re)built by HeroModelBuilder.
+func refresh_hero_animator() -> void:
+	_animator = HeroAnimator.new()
+	if not _animator.setup(self):
+		_animator = null
+
 # Pull state (written by Hook System when this player is hooked)
 var _pull_origin: Vector3 = Vector3.ZERO
 var _pull_destination: Vector3 = Vector3.ZERO
@@ -50,15 +61,25 @@ func kill(killer: Node, damage_type: String) -> void:
 	if state == State.DEAD:
 		return
 	state = State.DEAD
-	visible = false
 	$CollisionShape3D.disabled = true
 	velocity = Vector3.ZERO
+	# Play the death animation, then hide the body once it finishes. The hide is
+	# guarded on state so a respawn mid-animation cancels it (see activate()).
+	if _animator != null:
+		_animator.play_death(func() -> void:
+			if state == State.DEAD:
+				visible = false
+		)
+	else:
+		visible = false
 	died.emit(self, killer, damage_type)
 
 ## Lock movement (hook fired — player can't move until hook returns).
 func lock() -> void:
 	if state == State.ACTIVE:
 		state = State.LOCKED
+		if _animator != null:
+			_animator.play_throw()
 
 ## Unlock movement (hook returned).
 func unlock() -> void:
@@ -97,6 +118,9 @@ func _process_active(delta: float) -> void:
 	else:
 		velocity = Vector3.ZERO
 	move_and_slide()
+
+	if _animator != null:
+		_animator.set_moving(velocity.length() > 0.1)
 
 	# Update facing from input
 	facing_angle = input_manager.get_facing_angle()

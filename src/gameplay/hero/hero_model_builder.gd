@@ -17,29 +17,31 @@ const HERO_HOOK_GLB_PATH := "res://assets/models/heroes/%s_hook.glb"
 const HERO_BODY_TINT_SHADER := "res://assets/shaders/hero_body_tint.gdshader"
 
 # Socket spec (brief §6). Position is the rest-pose local offset for the
-# pre-rig fallback (Marker3D); after Mixamo lands, the rig path replaces
-# these with BoneAttachment3D using the bone names below.
-# Mixamo standard skeleton uses `mixamorig:` prefix.
+# pre-rig fallback (Marker3D); the rig path replaces these with
+# BoneAttachment3D using the bone names below.
+# Bones author as `mixamorig:Name` in Blender, but Godot's glTF importer
+# sanitizes the `:` to `_` on import, so the runtime skeleton names are
+# `mixamorig_Name`. Match the sanitized form here (epic story-001).
 const HERO_SOCKETS := {
 	"socket_hook_hand": {
 		"position": Vector3(-0.84, 0.50, -0.10),
-		"bone": "mixamorig:LeftHand",
+		"bone": "mixamorig_LeftHand",
 	},
 	"socket_offhand": {
 		"position": Vector3(0.84, 0.50, -0.10),
-		"bone": "mixamorig:RightHand",
+		"bone": "mixamorig_RightHand",
 	},
 	"socket_chain_origin": {
 		"position": Vector3(0.0, 1.16, 0.0),
-		"bone": "mixamorig:Spine2",
+		"bone": "mixamorig_Spine2",
 	},
 	"socket_hit_center": {
 		"position": Vector3(0.0, 0.96, -0.22),
-		"bone": "mixamorig:Spine1",
+		"bone": "mixamorig_Spine1",
 	},
 	"socket_head_top": {
 		"position": Vector3(0.0, 1.88, 0.0),
-		"bone": "mixamorig:Head",
+		"bone": "mixamorig_Head",
 	},
 }
 
