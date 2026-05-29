@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "blender": {
+      "type": "stdio",
+      "command": "/home/naseer/.local/bin/uvx",
+      "args": [
+        "blender-mcp"
+      ],
+      "env": {}
+    }
+  }
+}
