@@ -153,7 +153,14 @@ The user explicitly chose "Stop here, revise in a separate session." Do NOT atte
   - First baseline run: RTX 5050 / Vulkan Forward Mobile / prototype primitives Pudge: **p95 = 0.34 ms** (dev machine, NOT mid-tier mobile target)
   - Caveats documented: result is informational only — final perf verdict requires (1) O-1 device tier resolution, (2) Stage 10 final Pudge GLB, (3) measurement on actual target device
   - Contract O-12 updated: OPEN → PARTIAL (dev baseline captured, mobile measurement still blocked)
-- **Step 7** — Re-author 6 untestable acceptance criteria in model spec
+- ✅ **Step 7 — DONE 2026-05-31** — 6 untestable acceptance criteria rewritten in `design/gdd/models/pudge.md`:
+  - §E: 3-color jiggle_boundary → 2-color + gradient (aligned with contract §6)
+  - §F.1: added 3 new check lines (jiggle_boundary layer, bone count, collection placement — all now script-enforced by `validate_export.py`)
+  - §F.1b (NEW): added hook weighting gate referencing `verify_hook_weights.py`
+  - §F.2: "no errors/warnings" → "no ERROR rows + warnings reviewed against approved list"; LOD auto-detect myth busted (contract O-5), replaced with visibility_range manual setup verification
+  - §F.3: "silhouette readable" → objective measurement (hook tip extends body bounds by ≥20% character height, screenshot to evidence dir); "face features resolve" → pixel-counted asymmetric eyes + ≥3px pupils + ≥2px stitch lines, screenshot to evidence dir; tint shader gate expanded to 3 specific color values with named screenshot artifacts
+  - §F.4: "mid-tier device" → references contract O-1; "test scene" → concrete path to `src/scenes/perf/pudge_stress_test.tscn`; texture budget "≤ 2 MB" → "≤ 8 MB" with rationale (per O-7 verification, ETC2 RGBA actual size is ~1 MB/1024² — old 2 MB target was impossible)
+  - §H: added "All §12 open questions either RESOLVED in spec or migrated to contract §11 with owner + deadline + status"
 - **Step 8** — Re-run /design-review on revised model spec → target APPROVED
 - **Step 9** — Add Pudge to `design/gdd/hero-system.md` (Q12.18)
 

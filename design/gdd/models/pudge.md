@@ -1,722 +1,1728 @@
-# Pudge — Stage 2 Model Spec
+# Model Spec — Pudge
 
-> **Status**: DRAFT — awaiting character-artist approval before sculpt begins
-> **Hero ID**: `pudge`
-> **Stage**: 2 of 8 (Model Spec)
-> **Date**: 2026-04-28
-> **Brief**: `/design/characters/pudge_brief.md`
-> **Concept**: `/design/concept-art/pudge.md` — Silhouette B (Coiled Hook Carry) LOCKED
-> **Previous stage output**: concept turnaround sheet — Silhouette B approved 2026-04-28
-> **Next stage gate**: User approval of this spec → high-poly sculpt begins
+> **Status**: ⚠️ **MAJOR REVISION NEEDED** — /design-review 2026-05-30 surfaced 27 BLOCKING items across 6 specialist reviews. **Do NOT proceed to Stage 4 until revisions complete.** See `design/gdd/reviews/pudge-model-review-log.md` for full review record and `production/session-state/active.md` for resume instructions.
+> **Hero ID**: `pudge` (separate 4th hero — not in current Vex/Lash/Maw roster; hero-system.md needs updating later)
+> **Stage**: 3 of 10 (Model Specification)
+> **Date**: 2026-05-30
+> **Brief**: `design/characters/pudge-character-brief.md`
+> **Concept**: `design/concept-art/pudge.md` — Silhouette B (Coiled Hook Carry) APPROVED 2026-04-28
+> **Predecessor spec**: archived to `design/gdd/models/_archive/pudge.md.2026-04-28` (superseded by fresh Stage 3 authoring this session)
+> **Engine**: Godot 4.6
+> **Conflicts with**: `design/gdd/rigs/pudge.md` and `design/gdd/materials/pudge.md` — cross-doc reconciliation required before any specialist begins implementation
 
-This document is the written contract between character-artist and all downstream
-consumers (texture-artist, rigging-animator, blender-specialist, technical-artist).
-Nothing in this spec may change without notifying those consumers and updating this
-file.
+This document is the written contract between modeling and all downstream consumers
+(texture-artist, rigging-animator, blender-specialist, technical-artist, gameplay-programmer).
+Nothing in this spec may change without notifying those consumers and updating this file.
 
 ---
 
-## 1. Polycount Budget (LOD0)
+## 1. Overview
 
-Working target is **7,500 tris**, leaving a 1,500-tri safety margin against the
-9,000-tri hard ceiling in the brief. The 10% margin (750 tris of that 1,500)
-is reserved for correctives: if the belly deformation loops require a denser ring,
-or the raised-arm shoulder socket needs an extra loop, that headroom absorbs it
-without renegotiating the budget.
+| Field | Value |
+|---|---|
+| **Asset category** | Character — playable hero (MOBA) |
+| **Hero ID** | `pudge` |
+| **Role** | Tank / melee disruptor |
+| **Signature ability** | Hook throw — single-target ranged grab that pulls an enemy in |
+| **Gameplay fantasy** | Grotesque jovial butcher. Intimidating + amusing simultaneously. |
+| **Concept reference** | `design/concept-art/pudge.md` — Silhouette B ("Coiled Hook Carry") APPROVED 2026-04-28 |
+| **Target platform tier** | **Mobile Mid** — modern mobile MOBA (Brawl Stars / Vainglory tier) |
+| **Distance class** | **Mid** — primary view at 5-8 m gameplay camera, close-up at 1.5-2 m menu/select |
+| **Style direction** | Chibi (3 heads tall, exaggerated proportions, simplified anatomy) |
+| **Total height** | 1.4 m world units (Godot world scale, 1 unit = 1 m) |
+| **Bind pose** | T-pose (clean Mixamo retargeting). Silhouette B "raised hook arm" rest is driven by the idle animation layer, NOT baked into bind. |
+| **LOD strategy** | 4 levels (LOD0 / LOD1 / LOD2 / Impostor billboard) |
+| **Hook prop** | Separate object — detachable as projectile during `hook_throw` ability. 2 materials, 2 draw calls. |
+
+### Pipeline source
+
+This model is being built from a Hunyuan3D AI-generated base mesh (`textured_mesh` in `src/assets/models/heroes/anime_pudge.blend`). The AI mesh is used as **silhouette + bake reference only** — the final game-ready mesh is hand-retopologized (Stage 5). The original concept art (Silhouette B) remains the authoritative design target; the AI mesh approximates it but does not replace concept review.
+
+### Downstream consumers
+
+This spec is the contract for the following agents/stages:
+
+- **Stage 4** (Sculpt cleanup) — character-artist consumes the topology and silhouette targets.
+- **Stage 5** (Retopo) — character-artist consumes geometry budget, topology requirements, mirror strategy.
+- **Stage 6** (UV) — character-artist + texture-artist consume UV layout and texel density targets.
+- **Stage 7** (Texturing) — texture-artist consumes materials, channel packing, atlas sizes.
+- **Stage 8** (Rigging) — rigging-animator consumes deformation loops, skeleton bone list, sockets.
+- **Stage 9** (Animation) — rigging-animator consumes bind pose, sockets, jiggle bone reference.
+- **Stage 10** (Godot export) — blender-specialist + gameplay-programmer consume naming, pivot, orientation, material/draw-call budget.
+
+### Why this spec exists
+
+Before any geometry work begins, every downstream stage must agree on the numbers. If retopo finishes at 9k tris and the spec said 6k, texture-artist's budget plan is broken. If UV islands are 1024 packed but spec said 512, mobile memory budget breaks. The spec eliminates those late-stage surprises.
+
+---
+
+## 2. Geometry Budget
+
+Mobile Mid tier. Hard ceiling and working targets below — modeler aims for working,
+hard ceiling is the renegotiate-or-cut threshold.
+
+### LOD Table
+
+| LOD | Body tris (working) | Body tris (hard ceiling) | Hook tris | Combined LOD total | Use distance |
+|---|---|---|---|---|---|
+| **LOD0** | 5,400 | 6,000 | 600 | **6,000** working / **6,600** ceiling | 0 – 12 m (close + game cam) |
+| **LOD1** | 2,700 (50%) | 3,000 | 300 | **3,000** working / **3,300** ceiling | 12 – 25 m |
+| **LOD2** | 1,350 (25%) | 1,500 | 150 | **1,500** working / **1,650** ceiling | 25 m+ (LOD3 deferred to post-MVP per contract O-13) |
+| **LOD3** | ~~impostor sprite~~ | — | — | ~~8 frames @ 128×128 px (1024×128 horizontal strip)~~ | ~~50 m+~~ — **DEFERRED to post-MVP** per contract O-13; **LOD2 extends to infinity for MVP** |
+
+**Total geometry memory budget across all LODs** (body + hook): ~10,800 tris working.
+At ~20 bytes/vert × ~7k verts/LOD avg ≈ 140 KB mesh data per character — well inside
+mobile budget for 10 hero instances on screen.
+
+**LOD switch distances** are recommended starting values. Technical-artist tunes in
+Stage 10 based on actual draw-call profiling on target hardware.
+
+### Per-Region Tri Allocation (LOD0 body — 5,400 working target)
 
 | Region | Tris | Notes |
 |---|---|---|
-| Torso + belly sphere | 800 | 6 horizontal rings + 8 vertical columns on the gut dome. Front-facing density higher for stitch geometry reception. |
-| Apron stub | 120 | See section 3 — merged into torso geo below belt line. |
-| Head (skull + face plane) | 600 | Skull half-sphere; face recessed for eye socket and mouth cavity volumes. |
-| Jaw lower mass | 160 | Separate geometry block from skull base; allows jaw bone deformation. |
-| Teeth row (upper + lower) | 80 | Single low-poly row per jaw; see teeth decision in section 3. |
-| Eye geometry (both) | 120 | 2 x separate spheres, 6-sided cap; see section 4. |
-| Hook arm (left — chunkier) | 480 | Upper arm + forearm. Forearm radius is 20% larger than right arm equivalent. |
-| Other arm (right) | 380 | Upper arm + forearm. Slightly thinner than hook arm. |
-| Left hand (hook hand) | 200 | Simplified fist topology — no individual finger separation; fingers merged into 3-segment fist to receive hook prop and chain socket. |
-| Right hand | 160 | Same simplified fist; cleaver hold pose. |
-| Hips + pelvis mass | 300 | Connects torso base to upper legs; widened to read belly hang under belt. |
-| Left leg (upper + lower) | 240 | Stubby upper leg + stubby lower leg. |
-| Right leg (upper + lower) | 240 | Mirror of left leg. |
-| Left boot | 280 | Toe splay, worn sole, lace geometry stub (2 quad strips per boot face). |
-| Right boot | 280 | Mirror of left boot. |
-| Belt band + buckle | 200 | Belt is a flat ring around the waist; buckle is a separate 6-tri box attached to front center. |
-| Chain (3-4 visible links) | 320 | 4 links modeled as oval toroids; budget is 80 tris per link. See section 3 for placement. |
-| Hook prop (separate object) | **600** | See section 6. Within the 500-800 tri brief allowance. |
-| **Body total** | **4,840** | All regions above excluding hook prop. |
-| Safety margin reserve | 660 | Held for deformation loop additions and corrective quads. |
-| **LOD0 working total (body)** | **~5,500** | Comfortably inside 7,500 working target; sculptor has headroom for personality detail. |
-| **LOD0 with hook prop** | **~6,100** | Inside 7,500 working target. True ceiling is 9,000 (brief §2). |
+| **Head + face + jaw** | 720 | Skull dome + face plane + jaw block. Mouth cavity recessed. |
+| **Teeth strip (upper + lower)** | 80 | Single quad-strip per jaw edge, 8 quads × 1 quad tall × 2 rows. Individual teeth painted, not modeled. |
+| **Eyes (both)** | 100 | 2 × low-poly sphere caps (5-sided). Left ~15% larger per concept asymmetry. |
+| **Torso + belly sphere** | 950 | 8 vertical columns × 6 horizontal rings on belly (96 quads = 192 tris) + chest panel + back panel. Forward density higher for stitch geometry. |
+| **Apron stub** | 80 | Merged into torso geometry. 4-6 quad strip hanging from belt line. |
+| **Hips / pelvis mass** | 280 | Connects belly to upper legs. Bears 4 deformation loops. |
+| **Left arm (hook arm — chunkier)** | 520 | Upper arm + forearm. ~20% denser radius than right arm. |
+| **Right arm** | 420 | Upper arm + forearm. Standard radius. |
+| **Left hand (hook grip)** | 200 | Simplified fist — no individual fingers. Hosts hook attach socket. |
+| **Right hand (cleaver/offhand)** | 160 | Simplified fist. |
+| **Legs (both)** | 480 | Stubby thigh + shin per leg, 240 each. Mirrored UVs. |
+| **Boots (both)** | 560 | Boot box with toe splay + sole + lace stub geometry. Mirrored UVs. |
+| **Belt band** | 100 | Thin ring around waist (8 quads horizontal × 2 vert). |
+| **Belt buckle** | 40 | Flat box on belt front center. First-cut candidate. |
+| **Belt chain links (3-4 visible)** | 240 | 80 tris per oval-toroid link, 3 links visible from belt back/side. |
+| **Safety margin reserve** | 470 | Reserved for: belly extra ring if jiggle needs more density, shoulder corrective loop on hook arm side, hip extra loop. |
+| **LOD0 body total** | **5,420** | Inside 5,400 working target (+20 tris within margin). Hard ceiling 6,000 leaves 580 tris of headroom. |
 
-### Where to cut if forced under budget
+### Hook Prop Allocation (LOD0 — 600 tris)
 
-1. Teeth row: drop from 80 to 40 tris (halve the polygon resolution of the tooth
-   row strip — acceptable because painted detail carries the read).
-2. Chain links: reduce from 4 links to 3, saving 80 tris.
-3. Belt buckle: collapse from box geometry to painted quad, saving ~60 tris.
-4. Boot lace stubs: remove as geometry, paint into base color, saving ~80 tris total.
-5. Eye spheres: reduce from 6-sided to 4-sided cap, saving ~40 tris.
-
-In that worst case, body total drops to approximately 4,540 tris — still fully
-functional for all deformation requirements.
-
----
-
-## 2. Topology / Edge Flow Plan
-
-### Deformation loop requirements
-
-Every joint that moves under animation requires dedicated edge loops. Minimum counts
-below; sculptor may add more within budget.
-
-| Joint / Region | Minimum loops | Notes |
+| Region | Tris | Notes |
 |---|---|---|
-| Left shoulder socket | 4 loops | Hook arm raises to ~45 degrees above horizontal in idle; 4 loops prevent pinching at full raise. Extra loop required on hook-arm side only — asymmetric density is intentional. |
-| Right shoulder socket | 3 loops | Right arm hangs with limited raise range; 3 loops sufficient. |
-| Left elbow | 3 loops | Hook arm bends during hook_throw wind-up. |
-| Right elbow | 3 loops | Right arm cleaver swing (attack_basic). |
-| Left wrist | 2 loops | Wrist rotation for hook_throw release. |
-| Right wrist | 2 loops | Cleaver swing rotation. |
-| Hips | 4 loops | Walk/run waddle + death fall backward — highest deformation stress on the rig after the shoulder. |
-| Left knee | 3 loops | Stubby leg; knee bend is shallow in walk but active in death stagger. |
-| Right knee | 3 loops | Mirror. |
-| Left ankle | 2 loops | Boot sole stays near Y=0 throughout locomotion. |
-| Right ankle | 2 loops | Mirror. |
-| Neck base (trapezius merge) | Special — see below | |
-| Mouth | 4 concentric loops | Jaw bone drives lower half. Death and taunt require full open. |
-| Eyes | 5 concentric loops each | Left eye is larger — loop count is the same but diameter of the outermost ring is ~15% wider. The asymmetry lives in the sculpt shape, not a different loop count. |
+| Hook body (J-curve iron bar) | 280 | 8-sided cylinder bent into J. The silhouette priority — densest part. |
+| Inner curve / tip (blood zone) | 140 | Higher density for normal map detail (blood relief). UV island for blood spatter sits here. |
+| Chain link stubs (1-2 physically welded to hook) | 180 | Adjacent to hook body. These ride with the hook when projectile-spawned. |
+| **Hook total** | **600** | Exact budget. |
 
-### No-neck hunch — trapezius/skull join
+### Where to Cut if Forced Under Budget
 
-Per concept Open Note #4: the trapezius shoulder mass must merge into the base of
-the skull with at most 1-2 cm of visible neck column in model space (~0.01-0.02 m
-at 1 unit = 1 meter scale).
+In strict priority order — character-artist drops these in this sequence if profiling
+shows we're over draw-call or vertex-buffer budget:
 
-Edge flow plan: the neck column is treated as a 4-sided compressed ring. Instead of
-a full neck tube with 6-8 vertical segments, the neck column is a single 1-segment
-stub — 2 loops, 4 quads wide. The trapezius shoulder geo fans out radially from
-that stub in both directions. The Neck bone deforms this region but has near-zero
-rotation range by design; the animator is informed it is not a full neck joint.
+1. **Belt buckle box** → painted quad on belt strip (-40 tris)
+2. **Boot lace stubs** → painted into boot base color (-80 tris)
+3. **Belt chain links** → reduce 3 visible to 2 (-80 tris)
+4. **Teeth strip** → halve from 80 → 40 tris (-40)
+5. **Eye spheres** → flat discs (-40 tris)
+6. **Apron stub** → paint apron edge onto belt strip (-80 tris)
+7. **Hook prop chain links** → remove the 1-2 welded links (-180 tris)
 
-This must survive retopo without softening. The retopologist must resist the
-temptation to add neck height for ergonomic UV unwrapping — force the seam at the
-base-of-skull if needed, not by adding neck geometry.
+Total recoverable: ~540 tris. After all cuts: ~4,880 body + 420 hook = 5,300 total.
+This is the floor — below this, silhouette degrades unacceptably for the mobile MOBA read.
 
-### Belly deformation for gut-jiggle bone
+### LOD1 Collapse Plan (3,000 tris ceiling)
 
-The belly jiggle bone drives the gut bounce in idle, walk, run, and death. The
-belly sphere uses concentric horizontal loop rings centered on the gut's forward
-protrusion point (not the anatomical waist). Layout:
+Features that disappear or simplify at LOD1:
 
-- 3 rings above the equator of the gut sphere (transitioning into torso)
-- 1 ring at the equator (maximum circumference)
-- 2 rings below the equator (transitioning into hip/pelvis mass, where the
-  jiggle bone's influence fades to zero)
-- Total: 6 horizontal rings, 8 vertical column edges = 96 quads on the gut dome
+| Feature | LOD0 | LOD1 |
+|---|---|---|
+| Belt chain links | 3 separate toroids | Single twisted quad strip (~40 tris) |
+| Teeth strip | Geometry strip (80) | Painted dark gash (1 quad) |
+| Boot lace stubs | Quad strips (~60) | Removed, painted |
+| Eye spheres | Sphere caps (100) | Flat discs (24) |
+| Belt buckle | Box (40) | Painted quad on belt |
+| Hook arm asymmetry | Preserved (20% denser) | Preserved (silhouette-critical) |
+| Apron stub | 80 tris | Removed, painted |
+| Hook prop | 600 tris | 300 tris (no inner-curve bevel, 1 chain link stub) |
 
-The jiggle bone influence falloff: 100% on the equator ring and forward-facing
-lower rings, tapering to 0% at the torso-join rings and hip-join rings. The
-character-artist should mark the influence boundary on the retopo mesh with a
-seam loop or color annotation for the rigger.
+### LOD2 Collapse Plan (1,500 tris ceiling)
 
-No mixed-quad strategy is needed — full quads on the belly. The only triangles
-permitted are the pole caps on the very top of the gut sphere where it merges
-into the torso (hidden inside the torso overlap at all camera angles).
+Further reductions on top of LOD1:
 
-### Apron stub — merged into torso
+| Feature | LOD1 | LOD2 |
+|---|---|---|
+| Hook arm asymmetry | Preserved | **Collapsed** — both arms same density |
+| Boot toe splay | Reduced | Removed — boot becomes rounded prism |
+| Belly rings | 6 horizontal | 3 horizontal (still drives jiggle, just coarser) |
+| Stitch micro-geometry | Reduced | Removed — paint only |
+| Shoulder loops | 4 L / 3 R | 2 / 2 |
+| Mouth loops | 4 concentric | 3 concentric |
+| Eye loops | 5 concentric | 3 concentric |
+| Hook prop | 300 tris | 150 tris (box + single arc, no chain) |
 
-Decision: the apron stub is merged geometry, not a separate mesh.
+### LOD3 Impostor — DEFERRED to post-MVP
 
-Rationale: a separate mesh would add a draw call (pushing over the 2-material
-limit if the apron needed its own material) or require a second UV island that
-competes with belt/body UVs. Since the apron is a small stub tucked under the
-belt, it is a geometric protrusion from the lower torso front face, sharing the
-body material. Its topology is a flap of 4-6 quad rows hanging from the belt
-line, tapering to 2 quads at the bottom. Total: approximately 24-32 tris.
-The apron UV island shares the belt region of the body atlas (see UV plan,
-section 5).
+Per contract O-13 (`design/gdd/contracts/pudge-interface-contract.md` §11):
 
-### Teeth strategy
+**LOD3 impostor billboard is dropped from MVP scope.** LOD2 extends to
+infinity instead — Pudge renders at LOD2 (1,500 tris) for all distances
+beyond ~25 m.
 
-Decision: single low-poly tooth row, painted detail — no individual tooth geometry.
+Reasoning:
+- Godot 4.6 ships no built-in impostor system.
+- Building a custom impostor pipeline (8-angle camera bake + sprite-sheet
+  packing + custom shader for billboard orientation + LOD swap logic) is
+  multi-day work for one hero — does not fit MVP budget.
+- LOD2 at 1,500 tris × 10 instances × distance > 25 m is well within mobile
+  mid-tier draw budget; no measurable savings from going lower.
 
-Rationale: within the 6k-8k tri budget, individual tooth geometry would cost 20-40
-tris per tooth (Pudge has 8-10 visible teeth from front view = 160-400 tris) for a
-feature that resolves to approximately 8-12 pixels per tooth at 1080p top-down camera
-distance. The texture-artist can paint yellowed individual teeth with sharper/missing
-gap character using the material table values from the concept sheet at a fraction
-of that cost.
+#### Post-MVP design (preserved for reference)
 
-Implementation: the mouth is a recessed cavity — the jaw lower mass creates a
-slightly open-mouth shape at neutral. The upper lip region and lower jaw edge each
-carry a single quad-strip tooth row geometry (1 row top, 1 row bottom). This strip
-is 8 quads wide and 1 quad tall — approximately 16 tris per row, 32 total for both
-rows. The strip sits just inside the mouth opening so it catches light. The
-painted texture provides individual tooth character, dark gap between teeth, and
-the missing-tooth "gash" per brief §3.
+When impostor work is revisited, the original design intent:
 
-This tooth row is the first casualty at LOD1 — it collapses to a single painted
-dark gash quad, saving 32 tris.
-
-### Quad rule enforcement
-
-Quads only on all deforming surfaces (body, arms, legs, face, belly). Tris are
-permitted in the following hidden or flat locations only:
-
-- Pole caps inside the boot sole (hidden from camera entirely)
-- Interior of the mouth cavity (fully dark/occluded at game camera distance)
-- The very top of the gut-sphere-to-torso merge seam if a pole is required to
-  terminate the gut sphere rings
-
-5-poles and 3-poles (edge flow terminators) must be placed on flat stable surfaces:
-the center of the back torso panel, the center back of the head skull, and the
-interior of the mouth cavity. Never on or within two edge loops of a deforming joint.
+- Pre-rendered sprite billboard. 8 rotation angles (every 45°).
+- Rendered from top-down 30° pitch camera matching game camera angle.
+- 128×128 px per frame, packed as a 1024×128 horizontal strip OR a
+  512×256 grid (2 rows × 4).
+- South-facing (camera-facing) frame must show the **raised hook arm
+  silhouette** (Silhouette B's signature) to sell the hook hero identity
+  at glance-distance.
+- Generation script lives in `tools/blender/` (not yet written).
 
 ---
 
-## 3. Mesh Layout / Object Hierarchy
+## 3. Topology Requirements
 
-### Single skinned mesh vs. separated submeshes
+Topology is non-negotiable on deforming surfaces. Loop counts below are MINIMUMS —
+modeler may add within budget. Drop below these only with explicit character-artist
+and rigging-animator approval.
 
-Decision: two skinned mesh objects + one separate hook prop object. Three Blender
-objects total, two draw calls in Godot.
+### Deformation Loops Per Joint
+
+Every joint that moves under animation needs concentric edge loops perpendicular to
+the joint's primary rotation axis. Loops must be CLOSED RINGS, not open edge fans.
+
+| Joint / Region | Min loops | Reason |
+|---|---|---|
+| **Left shoulder socket** | **4** | Hook arm raises to ~45° above horizontal in idle (Silhouette B pose driven by anim). 4 loops prevent pinching at the raise extreme. **Asymmetric** — only left needs 4. |
+| **Right shoulder socket** | **3** | Right arm has limited raise range (cleaver swing for `attack_basic` only). 3 loops sufficient. |
+| **Left elbow** | **3** | Hook arm bends during `hook_throw` wind-up. |
+| **Right elbow** | **3** | Cleaver swing during `attack_basic`. |
+| **Left wrist** | **2** | Wrist rotation for hook release frame. |
+| **Right wrist** | **2** | Cleaver swing rotation. |
+| **Hips** | **4** | Walk/run waddle + death fall backward. Highest deformation stress after the shoulder. |
+| **Left knee** | **3** | Stubby chibi leg; knee bend shallow in walk, active in death stagger. |
+| **Right knee** | **3** | Mirror of left. |
+| **Left ankle** | **2** | Boot sole stays near Z=0 in locomotion. |
+| **Right ankle** | **2** | Mirror. |
+| **Mouth** | **4 concentric** | Jaw bone drives lower half. Death and taunt require full open. |
+| **Eyes (each)** | **5 concentric** | Both eyes use same loop count. Asymmetry (left eye ~15% larger) lives in sculpt sphere scale, NOT in loop count or density. |
+| **Neck base** | **Special — 2 loops only** | No-neck hunch (see below). |
+
+### Belly Topology — BellyJiggle Bone Domain
+
+The belly is Pudge's defining silhouette feature AND drives the `BellyJiggle` secondary
+motion bone. Topology must support both.
+
+**Ring layout** (concentric horizontal rings on the gut sphere, centered on the forward
+protrusion point — NOT the anatomical waist):
 
 ```
-pudge (Empty — scene root, no mesh)
-    mesh_pudge_body     (single skinned mesh: torso, head, arms, hands, legs,
-                         boots, belt, apron stub, chain links, eye geometry)
-    mesh_pudge_hook     (separate skinned mesh: hook prop; parented to arm_pudge
-                         via socket_hook_hand bone, separate UV atlas)
+   Z (up)
+    |
+    +-- Ring 6 (top, transitioning to torso/chest)        ← 0% jiggle
+    +-- Ring 5                                            ← 0% jiggle (transition)
+    +-- Ring 4                                            ← 50% jiggle (gradient)
+    +-- Ring 3 (EQUATOR — maximum circumference)          ← 100% jiggle
+    +-- Ring 2                                            ← 100% jiggle (forward-lower)
+    +-- Ring 1 (bottom, transitioning to hip mass)        ← 0% jiggle
+    +-- pole cap (hidden inside torso overlap)
 ```
 
-All body components (torso, head, arms, legs, belt, apron, chain links, eyes) are
-joined into `mesh_pudge_body` as a single mesh object with a single material slot.
-This costs one draw call. The hook prop is separate for two reasons: it has its own
-512x512 texture atlas (per brief §7) requiring a separate material slot, and it
-must be detachable during the hook_throw animation (spawned as a separate gameplay
-object when the hook is in flight). Total: 2 draw calls, matching brief §2 hard
-limit.
+- **6 horizontal rings** total
+- **8 vertical columns** (8-sided radial topology)
+- **96 quads total** on the gut dome = 192 tris (matches budget §2)
 
-### Hook prop as separate object
+**BellyJiggle influence falloff** (painted as `jiggle_boundary` vertex color layer):
 
-`mesh_pudge_hook` is parented to the skeleton (`arm_pudge`) and weight-painted
-100% to the `bone_left_hand` bone. At rest it follows the hand. During
-`hook_throw`, gameplay code detaches it and spawns a projectile. The rigger must
-ensure the hook mesh has no weights other than `bone_left_hand` — confirmed in
-handoff notes to rigging-animator.
+- **Red (RGB 1, 0, 0) = 100%**: equator ring (Ring 3) + forward-lower ring (Ring 2)
+- **Yellow (RGB 1, 1, 0) ≈ 50%**: transition rings (Ring 4 above, Ring 1 below)
+- **White (RGB 1, 1, 1) = 0%**: top rings (5, 6) joining torso + lowest ring joining hip
 
-### Eye geometry
+The rigger reads `jiggle_boundary` directly to assign BellyJiggle weights (capped at
+80% per rig spec — character-artist paints raw 0-100% gradient, rigger applies the cap).
 
-Eyes are merged into `mesh_pudge_body`. Two simple 6-sided sphere caps, placed in
-the eye socket cavities. They share the body material and UV atlas (emissive region
-is painted on the body atlas emissive map, not a separate texture). Eyes are NOT
-separate objects — keeping them merged holds draw calls at 2 and avoids a third
-material.
+### No-Neck Hunch (Trapezius / Skull Join)
 
-The eye asymmetry (left eye larger per brief §3) is authored in the sculpt geometry.
-The left eye sphere cap is scaled ~15% larger in X and Y before the cap is joined
-into the body mesh.
+Per concept Silhouette B: "head sunk into hunched shoulders, no visible neck." Topology
+must respect this — the trapezius/shoulder mass merges directly into the base of the
+skull with at most **1-2 cm of visible neck column** (0.01-0.02 m at 1 unit = 1 m).
 
-### Naming convention for Blender objects
+**Implementation**:
 
-See Section 11 (Naming Convention Table) for the authoritative full list.
+- The neck column is a **single 1-segment stub**, 4 quads wide × 2 loops.
+- NOT a full neck tube with 6-8 vertical segments.
+- The trapezius shoulder geometry fans out radially from this stub in both directions.
+- The `Neck` bone deforms this region but has **near-zero useful rotation range** —
+  rigger constrains to ±5° max per axis (rig spec §14).
+- Head rotation is driven by the `Head` bone, NOT `Neck`.
+
+**Retopo discipline**: the retopologist must resist the temptation to add neck height
+for ergonomic UV unwrapping. Force the UV seam at the base-of-skull instead. Adding
+neck geometry breaks the silhouette.
+
+### Quad Rule Enforcement
+
+**Quads only on all deforming surfaces**: body, arms, legs, face, belly, hands, boots.
+
+**Tris permitted** ONLY in these specific hidden / non-deforming locations:
+
+- **Pole caps inside boot sole** — fully hidden from camera at all angles
+- **Mouth cavity interior** — fully occluded at game camera distance
+- **Top of gut sphere → torso merge seam** — inside torso overlap, never visible
+- **Hook prop interior cap** — inside the J-curve where ray-cast won't see
+
+**5-poles and 3-poles** (edge-flow terminators) must be placed on **flat stable surfaces**:
+
+- Center of the **back torso panel** (between the shoulder blades, hidden from top-down cam)
+- Center of the **back of the head skull** (occluded at top-down 30° pitch)
+- Inside the **mouth cavity**
+
+**Never place poles** on or within 2 edge loops of a deforming joint. A pole at the
+shoulder joint causes shearing during arm rotation.
+
+### Symmetry and Mirror Axis
+
+- **Mirror axis**: X-axis (left/right of character)
+- **Build half then mirror**: standard workflow — model left half (-X side from character
+  POV = -X in world), apply Mirror modifier with Clipping enabled, apply at LOD0.
+- **Break symmetry AFTER mirroring** for these intentional asymmetries:
+  - **Left arm chunkier** (~20% wider radius): scale arm geometry on +X side after mirror apply.
+  - **Left eye larger** (~15%): scale eye sphere on +X side after mirror apply.
+  - **Belt chain links**: positioned asymmetrically (left hip coil per concept) — built post-mirror.
+
+### Smoothing Groups / Custom Normals
+
+- **Smooth shading** enabled on all body and hook geometry.
+- **Sharp edges** (Mark Sharp) at: boot sole edge, belt buckle outer edge, hook tip,
+  apron stub edge.
+- **Custom normals NOT required at this scale** — Pudge is too small and too chibi for
+  normal-driven seam control to matter. Standard auto-smooth at 30° angle threshold
+  is sufficient.
+- **Auto-smooth angle**: 30°.
 
 ---
 
-## 4. UV Layout Plan — 1024x1024 Body Atlas
+## 4. UV Layout
 
-### Texel density targets
+Two atlases: 1024×1024 body, 512×512 hook prop. Single UV channel per mesh (no UV1 —
+lightmap/detail maps not needed at this tier). Pack with 8 px minimum padding at the
+authoring resolution.
 
-| Region | Target density | Notes |
-|---|---|---|
-| Face (eyes, mouth, nose area) | 512 px/m | Per brief §2. Highest density region. Asymmetric eyes and painted teeth require maximum resolution. |
-| Head (skull, back of head, ears) | 256 px/m | Back of head not readable at top-down camera; standard density is acceptable. |
-| Torso front (belly, stitches, stitch holes) | 256 px/m | Stitches must resolve at game camera distance; 256 px/m achieves this. |
-| Torso back | 128 px/m | Back is rarely visible at top-down angle; can sacrifice density here. |
-| Arms (both) | 256 px/m | Hook arm is more visible but does not require higher density than torso. |
-| Hands | 256 px/m | Fist detail reads via silhouette, not texture. Standard density. |
-| Legs | 128 px/m | Nearly hidden under gut; minimal density acceptable. |
-| Boots | 256 px/m | Boots are a personality element visible when Pudge walks. Scuff and lace detail requires 256 px/m. |
-| Belt + buckle | 256 px/m | Buckle metallic detail must resolve for material read. |
-| Apron stub | 256 px/m | Shares belt region; blood staining must be legible. |
-| Chain links | 256 px/m | Chain links need highlight painted on upper face; 256 px/m achieves 8-12 px per link at game camera. |
-| Eye sclera + pupil | 512 px/m (subset of face island) | Eyes carry emissive and must read at all distances. |
+### Body Atlas — 1024 × 1024 (`mat_pudge_body`)
 
-### UV island layout (1024x1024 atlas, numbered grid)
-
-The atlas is divided conceptually into four quadrants. Island placement below is
-described by quadrant and approximate occupancy. Minimum 8 px padding between all
-islands at 1024 resolution.
+Conceptual quadrant layout. Island placement below is by quadrant + approximate
+occupancy. The packer (Blender's built-in Pack Islands or UV Packmaster) will
+optimize within these constraints.
 
 ```
 +---------------------------+---------------------------+
+| TOP-LEFT (~35% of atlas)  | TOP-RIGHT (~25%)          |
 |                           |                           |
 |   FACE ISLAND             |   TORSO FRONT             |
-|   (top-left quadrant)     |   (top-right quadrant)    |
 |                           |                           |
-|   Face takes ~35% of      |   Belly + stitches +      |
-|   total atlas.            |   chest panel takes ~25%. |
-|   Skull wraps below face  |   Apron stub sub-island   |
-|   island within same      |   sits in bottom-right    |
-|   quadrant (~10%).        |   corner of this quad.    |
-|                           |                           |
+|   - Face (~25%)           |   - Belly sphere front    |
+|   - Skull wrap (~10%)     |   - Chest panel           |
+|   - Eye sclera + pupil    |   - Stitches (painted)    |
+|     sub-island            |   - Apron stub sub-island |
+|                           |     (bottom-right corner) |
 +---------------------------+---------------------------+
+| BOTTOM-LEFT (~25%)        | BOTTOM-RIGHT (~15%)       |
 |                           |                           |
 |   ARMS + HANDS            |   LEGS + BOOTS + BELT     |
-|   (bottom-left quadrant)  |   (bottom-right quadrant) |
 |                           |                           |
-|   Left arm (hook arm)     |   Left boot + Right boot  |
-|   island is 20% taller    |   islands (mirrored,      |
-|   than right arm island   |   sharing one UV strip)   |
-|   — matches chunkier      |   Belt band wraps as a    |
-|   geometry. Right arm     |   thin horizontal strip.  |
-|   beneath left arm.       |   Legs share a narrow     |
-|   Both hands stacked      |   strip; mostly occluded. |
-|   below arm islands.      |   Chain links: separate   |
-|   Chain links share       |   strip at bottom edge.   |
-|   edge of arm islands.    |                           |
+|   - Left arm (taller)     |   - Both legs mirrored    |
+|   - Right arm (below)     |     (one strip)           |
+|   - Left hand             |   - Both boots mirrored   |
+|   - Right hand            |     (one strip)           |
+|   - Chain links edge      |   - Belt band (thin       |
+|     strip                 |     horizontal strip)     |
+|                           |   - Torso back panel      |
 +---------------------------+---------------------------+
 ```
 
-### Mirroring strategy
+Unused / padding accounts for ~5% of atlas.
 
-Mirror the following body regions to reclaim UV space:
+#### Body Texel Density Targets
 
-- Left leg and right leg: mirrored UV, single island. Both legs share the same
-  UV strip. Acceptable because legs are nearly identical and barely visible; no
-  asymmetric detail planned.
-- Left boot and right boot: mirrored UV, single island. Boot wear/scuff is
-  symmetric at this budget. Asymmetric detail (split seam on left boot per concept
-  back-view description) can be added by the texture-artist using the emissive/
-  roughness channel variation rather than breaking UV symmetry.
-- Left arm and right arm: NOT mirrored. The hook arm (left) is visibly chunkier
-  and has different shadow/light placement at raised position. Each arm gets its
-  own UV island.
-- Torso left/right halves: NOT mirrored. Stitches, stitch holes, and the belt
-  buckle are front-centered and require asymmetric painting capability.
-- Face: NOT mirrored. Asymmetric eyes (left larger, different emissive intensity
-  subtlety) require full asymmetric UV coverage.
+| Region | Density (px/m) | Why this density |
+|---|---|---|
+| **Face (eyes, mouth, asymmetric features)** | **512** | Highest density region. Mobile MOBA portraits zoom face — must hold up at menu close-up (~1.5 m). |
+| Head (back, skull) | 256 | Back of head not readable at top-down game cam — standard density fine. |
+| Torso front (belly + stitches + chest) | 256 | Stitches must resolve at game cam — 256 px/m gives ~3 px stitch width. |
+| Torso back | **128** | Half density. Back is rarely visible at top-down 30° pitch. |
+| Arms (both) | 256 | Hook arm slightly more visible but doesn't justify higher density. |
+| Hands | 256 | Fist detail reads via silhouette, not texture. Standard. |
+| Legs | **128** | Mostly hidden under gut overhang. Minimal density. |
+| Boots | 256 | Personality element when Pudge walks. Scuff + lace detail need 256. |
+| Belt + buckle | 256 | Metallic buckle highlight needs to resolve. |
+| Apron stub | 256 | Blood staining must be legible. |
+| Belt chain links | 256 | ~8-12 px per link at game cam — sufficient with painted highlights. |
 
-### Padding
+#### Body UV Seam Placement
 
-8 px minimum between all islands at 1024 resolution. The packer (UV packmaster
-or Blender's built-in pack islands) must be run at margin=8px before final layout
-is submitted to texture-artist. Verify no seams bleed into adjacent islands at
-mipmaps by checking MIP level 2 (256x256) in the import preview.
+Seams hidden from primary camera angle (top-down 30° pitch):
+
+- **Head**: seam at back-of-skull center vertical
+- **Torso**: seam along center-back spine column (vertical)
+- **Arms**: seam along inner arm (axilla — facing body, not camera)
+- **Legs**: seam along inner thigh (occluded by gut overhang)
+- **Boots**: seam at back of boot (rear-facing at gameplay cam)
+- **Belt**: seam at back-center of belt band
+- **Apron stub**: seam at attachment edge under the belt
+
+### Hook Atlas — 512 × 512 (`mat_pudge_hook`)
+
+Independent atlas + material for the detachable hook prop. Layout:
+
+```
++---------------------------+---------------------------+
+| HOOK BODY TOP HALF (~60%) |
+|                           |
+|   J-curve iron bar +      |
+|   inner curve sub-region  |
+|   (blood zone — painted   |
+|   only on inner curve     |
+|   and tip)                |
++---------------------------+---------------------------+
+| Chain link 1  | Chain link 2  | Chain link 3 | Chain link 4 |
+| (largest,     | (slightly     | (smaller)    | (smallest    |
+|  closest to   |  smaller)     |              |  / partial   |
+|  hand)        |               |              |  island)     |
++---------------+---------------+--------------+--------------+
+```
+
+**Important hook chain distinction**:
+- Chain links that drape from hand to belt (the visible silhouette chain) → modeled
+  as part of `mesh_pudge_body`, on the BODY atlas.
+- Chain links physically welded to the hook prop (1-2 links exiting hook spine) → on
+  the HOOK atlas. These ride with the hook as a projectile.
+
+#### Hook Texel Density Targets
+
+| Region | Density (px/m) | Why |
+|---|---|---|
+| Hook body bar (J-curve) | 512 | Hook is silhouette priority — densest part. |
+| Inner curve / tip (blood zone) | 512 | Blood spatter painting needs resolution. |
+| Chain link stubs (on hook) | 256 | Smaller features; 8-12 px per link at game cam. |
+
+### Mirroring Strategy
+
+Mirror these regions to reclaim ~30% of UV space:
+
+- **Both legs**: mirrored — one UV island shared. Legs are nearly identical and
+  barely visible. No asymmetric leg detail planned.
+- **Both boots**: mirrored — one UV island. Boot wear/scuff is symmetric.
+  The concept's "split seam on left boot" can be added by texture-artist using
+  emissive/roughness channel variation, NOT by breaking UV symmetry.
+
+**NOT mirrored** (asymmetric details required):
+
+- **Left/right arms**: hook arm is visibly chunkier (~20% denser radius). Each gets
+  its own UV island. Texture-artist may add hook-side wear details.
+- **Torso left/right**: stitches, stitch holes, and front-centered belt buckle
+  require asymmetric painting capability.
+- **Face**: left eye is larger; asymmetric eye emissive intensity may differ.
+  Full asymmetric UV coverage required.
+- **Belt chain coil**: positioned on character's left hip per concept Silhouette B.
+
+### Padding and Pack Verification
+
+- **Minimum 8 px padding** between all islands at 1024 authoring resolution.
+- Run Pack Islands with `margin=0.0078` (≈ 8 px / 1024).
+- **MIP test**: verify at MIP level 2 (256 × 256) — no island bleeds into adjacent
+  islands. If bleeds appear, increase padding to 12 px on the affected islands and
+  re-pack.
+
+### Why No UV1
+
+UV1 channels are needed for:
+- Lightmaps (baked global illumination) — not used at mobile MOBA scale; dynamic
+  lighting only.
+- Detail/decal maps — out of scope for chibi style at 1024 atlas density.
+- Tint mask channel — already handled by vertex color or single-channel mask map
+  (see Materials §5).
+
+Single UV channel keeps mesh data lean and import simple.
 
 ---
 
-## 5. Hook Prop UV / Texture Plan — 512x512 Hook Atlas
+## 5. Materials
 
-The hook prop (`mesh_pudge_hook`) has its own 512x512 atlas and its own material
-(`mat_pudge_hook`). The atlas contains:
+Two materials, two draw calls, four textures per material. Mobile PBR pipeline with
+**ORM channel packing** (R=AO, G=Roughness, B=Metallic) — industry-standard for mobile
+to halve texture sample count.
 
-| Element | UV region | Notes |
-|---|---|---|
-| Hook body (J-curve iron bar) | Top half of atlas (~60%) | Hook is the primary read; give it the most pixels. Upper face highlight painted per concept material table. |
-| Hook inner curve / tip (blood zone) | Sub-region within hook body island | Blood spatter painting is isolated here; the texture-artist must paint blood only on inner curve and tip, not the full hook. |
-| Chain link 1 (closest to hand) | Bottom-left quadrant | Largest link; most visible. |
-| Chain link 2 | Bottom-center-left | Second link; slightly smaller island than link 1. |
-| Chain link 3 | Bottom-center-right | Third link. |
-| Chain link 4 (closest to belt coil) | Bottom-right | Smallest visible link; can be partial island. |
+### Material List
 
-Chain links on the hook prop atlas: the chain links that are part of the idle
-silhouette hang between the left hand and the belt coil. They are part of
-`mesh_pudge_body` (see object hierarchy, section 4). The hook prop atlas carries
-only the chain links that are physically welded to or immediately adjacent to the
-hook prop object itself (the 1-2 links exiting the hook's spine). This is a
-deliberate split: the visual chain that drapes from hand to belt is skinned to the
-chain bones and belongs on the body atlas; the hook-attached links are static
-relative to the hook and belong on the hook atlas.
+| Material | Mesh | Atlas | Shader | Tintable? |
+|---|---|---|---|---|
+| `mat_pudge_body` | `mesh_pudge_body_lod*` | 1024 × 1024 | `hero_body_tint.gdshader` (custom) | **Yes** — team tint via mask channel |
+| `mat_pudge_hook` | `mesh_pudge_hook_lod*` | 512 × 512 | Godot StandardMaterial3D | **No** — neutral iron, no team tint |
 
-At 512 px resolution, individual link detail is 8-12 px per link. The texture-artist
-must hand-paint the upper-face highlight per concept note (texture-artist Open Note #3
-in concept sheet) — do not rely on normal map alone at mobile renderer resolution.
+**Draw call budget**: 2 per Pudge instance. With 10 heroes on screen, total mesh draw
+calls = 20 (10 bodies + 10 hooks). Comfortable for mobile renderer.
 
-AO bake note for texture-artist: bake AO for the hook prop in a combined scene
-with `mesh_pudge_body` present, specifically so the hand-to-hook contact zone
-receives correct shadowing. This is flagged explicitly in concept Open Note #5 and
-repeated here.
+### Channel Packing — Body Material
 
----
-
-## 6. Pivot, Scale, and Orientation
-
-### World origin and feet plane
-
-- Mesh origin at world origin (0, 0, 0).
-- Feet plane: the bottom of both boot soles must sit at Y=0. The armature root
-  bone (Hips) sits above Y=0 at the character's anatomical hip height.
-- This matches the loader contract at `hero_model_builder.gd:28-36` which places
-  the instantiated GLB root at the player capsule origin with no transform offset.
-  Do not add any translation or rotation to the GLB root node.
-
-### Forward axis
-
-Forward = -Z. This is the Godot 4.6 default and the loader expectation. In Blender
-the export orientation must be set to Y Forward, -Z Up if using the default Blender
-coordinate space, or configured explicitly in the GLTF exporter settings. The
-blender-specialist's `blender-export-check` skill must verify this before export.
-
-### Scale
-
-1 Blender unit = 1 meter. Apply scale (Ctrl+A > All Transforms) before export.
-Do not leave a non-unity scale on any object.
-
-Pudge total height (chibi 3-head-tall proportions): the head is 30% of total height
-per brief §2. Target total height is **1.4 m** (measured from boot sole at Y=0 to
-the top of the skull).
-
-- Head height: 1.4 m × 0.30 = **0.42 m**
-- Below-head body (torso + legs): **0.98 m**
-- Belly sphere radius: approximately 0.28 m (gut protrudes ~0.3 units forward of
-  the feet per concept side-view description, making the belly wider than the legs
-  beneath it)
-- Boot height: approximately 0.10 m — visible tops just beneath gut overhang
-
-These are target values. The sculptor may adjust ±5% for visual appeal provided
-the 3-head-tall read is preserved.
-
-### Transforms before export
-
-All transforms must be applied before the GLTF export step: location, rotation,
-scale on all mesh objects and on the armature. The blender-export-check skill
-enforces this. The character-artist must apply transforms before handing to
-blender-specialist.
-
----
-
-## 7. LOD Plan
-
-### LOD0 — full detail (~6,100 tris including hook prop)
-
-Full body spec as described in sections 1-6. All topology, loops, teeth row, chain
-links, boot lace stubs, eye spheres, belt buckle geometry, and hook prop at full
-resolution.
-
-### LOD1 — ~50% (~3,050 tris)
-
-Features to collapse or simplify for LOD1:
-
-| Feature | LOD0 state | LOD1 state |
-|---|---|---|
-| Chain links | 4 separate toroid meshes (320 tris) | Collapsed to static painted geometry — a single twisted quad strip (~40 tris) sharing the body atlas |
-| Teeth row | Geometry strip (32 tris) | Replaced by painted dark gash — a single recessed quad in the mouth cavity |
-| Boot lace stubs | Quad strips on boot face (~80 tris) | Removed; laces painted into boot base color |
-| Eye spheres | 6-sided caps (120 tris) | Replaced by flat discs (24 tris total) |
-| Belt buckle | Geometry box (~40 tris) | Replaced by painted quad on belt strip |
-| Asymmetric arm radius | Geometry difference maintained | Asymmetry preserved in LOD1 — it is a silhouette-critical feature |
-| Apron stub | 24-32 tris | Removed; apron edge painted onto belt strip base color |
-| Hook prop | 600 tris | Simplified to 300 tris (remove inner curve bevel, reduce chain link count to 2) |
-
-### LOD2 — ~25% (~1,500 tris)
-
-Features lost or further collapsed:
-
-| Feature | LOD1 state | LOD2 state |
-|---|---|---|
-| Apron stub | Already removed | (already removed) |
-| Hook arm asymmetry | Preserved | Collapsed — both arms use identical polygon count and radius |
-| Boot toe splay geometry | Reduced | Removed; boot box is a simple rounded rectangular prism |
-| Belly deformation rings | 6 rings | Reduced to 3 rings — sufficient for gut-jiggle bone deformation |
-| Stitch geometry (raised edges) | If modeled as slight extrusion | Removed — painted only |
-| Hook prop | 300 tris | 150 tris (box + single curve representing hook J, no chain detail) |
-| Shoulder deformation loops | 4/3 loops | Reduced to 2 loops per shoulder |
-| Face concentric loops | 5 loops eyes, 4 loops mouth | 3 loops each — minimum for functional deformation |
-
-### LOD3 — impostor/billboard
-
-The impostor is a pre-rendered sprite sheet of Pudge at 8 rotation angles (every
-45 degrees: 0, 45, 90, 135, 180, 225, 270, 315 degrees). Each frame is rendered
-from a top-down 30-degree pitch camera matching the game camera angle, at 128x128
-px per frame (total: 1024x128 px horizontal strip, or a 512x256 px grid at 2 rows
-of 4).
-
-Minimum frames required for gameplay readability:
-- 4 cardinal angles (N, E, S, W)
-- 4 diagonal angles (NE, SE, SW, NW)
-
-The impostor must show the raised hook arm silhouette (Silhouette B) in the
-front-facing (S from top-down = facing the camera) frame. The technical-artist
-generates the impostor sprite in Stage 8 from the LOD2 render — character-artist
-is not responsible for impostor generation.
-
-### LOD switch distances (recommended — technical-artist to tune in Stage 8)
-
-| LOD | Switch in | Switch out | Notes |
+| Texture | Resolution | Channels | Content |
 |---|---|---|---|
-| LOD0 | — | 15 m from camera | Full detail at close range |
-| LOD1 | 15 m | 30 m | Camera sits at ~12 m per brief; LOD0 is active during normal play |
-| LOD2 | 30 m | 50 m | Background/edge-of-map distances |
-| LOD3 impostor | 50 m | — | Very far or off-screen |
+| `pudge_body_basecolor.png` | 1024 × 1024 | RGB + A | RGB = hand-painted base color (un-tinted). **A = tint mask** (1.0 = full tint, 0.0 = no tint, smooth gradient permitted at boundaries). |
+| `pudge_body_normal.png` | 1024 × 1024 | RG (B reconstructed) | Tangent-space normal map baked from high-poly. B channel reconstructed at runtime via `sqrt(1 - R² - G²)` to save 1/3 texture size. |
+| `pudge_body_orm.png` | 1024 × 1024 | RGB | **R = AO** (baked combined scene), **G = Roughness**, **B = Metallic** |
+| `pudge_body_emissive.png` | 256 × 256 | RGB | Sparse texture — eyes only. Cropped to the eye UV sub-island to save memory. Black elsewhere. |
+
+**Why a separate small emissive texture**: the emissive region is ~3% of the body atlas
+(eyes only). Allocating a full 1024 emissive map would waste ~1 MB for one tiny feature.
+A cropped 256 × 256 holding just the eye island region drops emissive cost to ~64 KB.
+
+**Tint mask painting guide** (alpha channel of `pudge_body_basecolor.png`):
+
+| Surface | Alpha value | Tints to team color? |
+|---|---|---|
+| Skin (face, body, arms, legs) | 1.0 | Yes — primary identity |
+| Leather (belt, boots) | 0.0 | No — natural brown |
+| Iron (belt buckle, chain links) | 0.0 | No — neutral metal |
+| Stitches | 0.0 | No — black thread |
+| Eyes (sclera + pupil) | 0.0 | No — yellow + black |
+| Teeth | 0.0 | No — yellowed off-white |
+| Mouth interior | 0.0 | No — dark red |
+| Apron stub | 0.0 | No — bloodied off-white |
+| Blood splatter | 0.0 | No — red |
+
+Texture-artist paints the alpha as 1.0 on all skin regions, 0.0 everywhere else.
+Smooth transition (1-2 px ramp) at skin/cloth boundaries to avoid hard tint edges.
+
+### Channel Packing — Hook Material
+
+| Texture | Resolution | Channels | Content |
+|---|---|---|---|
+| `pudge_hook_basecolor.png` | 512 × 512 | RGB | Hand-painted iron base color + blood spatter on inner curve/tip. No alpha. |
+| `pudge_hook_normal.png` | 512 × 512 | RG (B reconstructed) | Tangent-space normal from fresh high-poly bevel pass (NOT from AI mesh). |
+| `pudge_hook_orm.png` | 512 × 512 | RGB | R = AO (combined scene bake), G = Roughness, B = Metallic |
+
+No emissive on hook prop. No tint mask (hook is always iron-grey).
+
+### Shader Target — Body
+
+Use the existing `res://assets/shaders/hero_body_tint.gdshader` (already integrated in
+`HeroModelBuilder._apply_hero_tint()`). This spec extends it to use the **mask-based
+tint** approach instead of the current hue-band detection method.
+
+#### Shader inputs (uniforms)
+
+| Uniform | Type | Source | Default |
+|---|---|---|---|
+| `tint_color` | vec3 | Per-instance from `HeroConfig.hero_color` | white |
+| `tint_strength` | float | Constant or per-team modifier | 1.0 |
+| `albedo_texture` | sampler2D | `pudge_body_basecolor.png` | — |
+| `normal_texture` | sampler2D | `pudge_body_normal.png` | — |
+| `orm_texture` | sampler2D | `pudge_body_orm.png` | — |
+| `emissive_texture` | sampler2D | `pudge_body_emissive.png` (256 × 256) | — |
+| `emissive_color` | vec3 | Material constant per concept | `(1.0, 0.7, 0.0)` |
+| `emissive_energy` | float | Material constant | 3.0 |
+
+#### Shader logic (per-fragment, pseudocode)
+
+```glsl
+vec4 albedo_sample = texture(albedo_texture, UV);
+vec3 base_rgb = albedo_sample.rgb;
+float tint_mask = albedo_sample.a;
+
+// Mix between base color and tinted color by mask
+vec3 final_albedo = mix(base_rgb, base_rgb * tint_color, tint_mask * tint_strength);
+
+vec3 normal_ts = decode_normal_rg(texture(normal_texture, UV).rg);
+
+vec3 orm = texture(orm_texture, UV).rgb;
+float ao = orm.r;
+float roughness = orm.g;
+float metallic = orm.b;
+
+vec3 emissive_sample = texture(emissive_texture, eye_subuv).rgb;
+vec3 final_emissive = emissive_sample * emissive_color * emissive_energy;
+
+ALBEDO = final_albedo;
+NORMAL_MAP = normal_ts;
+AO = ao;
+ROUGHNESS = roughness;
+METALLIC = metallic;
+EMISSION = final_emissive;
+```
+
+### Shader Target — Hook
+
+Standard Godot `StandardMaterial3D` with:
+- Albedo texture: `pudge_hook_basecolor.png`
+- Normal texture: `pudge_hook_normal.png` (set normal map flag)
+- ORM texture: routed to AO, Roughness, Metallic via Godot's built-in ORM import
+- No emissive, no tint, no custom shader needed
+
+### Texture Compression (Godot Import Settings)
+
+| Map | Mobile compression | Memory per map (1024²) | Memory per map (512²) |
+|---|---|---|---|
+| BaseColor (RGBA) | ASTC 6×6 RGBA | ~340 KB | ~85 KB |
+| Normal (RG) | ASTC 6×6 RG | ~170 KB | ~43 KB |
+| ORM (RGB) | ASTC 6×6 RGB | ~256 KB | ~64 KB |
+| Emissive (RGB, 256²) | ASTC 6×6 RGB | ~16 KB | — |
+
+**Total texture memory per Pudge instance** (shared across instances of same hero):
+~782 KB for body atlas + ~192 KB for hook atlas = **~975 KB ≈ 1 MB**.
+
+10 hero instances on screen all share the same body/hook textures (only `tint_color`
+uniform differs per instance) — total scene texture cost stays at **~1 MB**, not 10 MB.
+
+### Material Property Tables (Concept-Locked Values)
+
+Reference values from `design/concept-art/pudge.md` material table. The texture-artist
+must paint these into base color, roughness, and metallic channels:
+
+| Surface | BaseColor (hex) | Roughness (G) | Metallic (B) |
+|---|---|---|---|
+| Skin (base) | `#8A8A7A` | 0.75 | 0.05 |
+| Skin (shadow) | `#6B6B5E` | 0.70 | 0.08 |
+| Skin (highlight) | `#9E9E8E` | 0.80 | 0.05 |
+| Stitch thread | `#332519` | 0.90 | 0.00 |
+| Stitch hole / wound | `#5C1A1A` | 0.85 | 0.00 |
+| Teeth | `#C8B87A` | 0.80 | 0.00 |
+| Eye sclera | `#F5E870` | 0.20 | 0.00 |
+| Eye pupil | `#1A0A0A` | 0.90 | 0.00 |
+| Belt leather | `#59330F` | 0.70 | 0.15 |
+| Belt buckle | `#726E6A` | 0.35 | 0.70 |
+| Boot leather | `#4A2E0A` | 0.75 | 0.10 |
+| Boot sole | `#1A1510` | 0.90 | 0.00 |
+| Chain (iron) | `#4A4844` | 0.45 | 0.65 |
+| Hook body (iron) | `#3E3C38` | 0.40 | 0.70 |
+| Hook tip / blood | `#8A1A1A` | 0.80 | 0.10 |
+
+Skin base values are **desaturated neutral** — the tint shader applies team color on
+top. **Do not bake green/red/blue into the skin base** — that would fight the tint.
+
+### Tint Validation (Texture-Artist Verification Step)
+
+Before finalizing the body texture, render the model with three team tint values:
+
+- Green: `Color(0.5, 0.8, 0.2)`
+- Red: `Color(0.9, 0.2, 0.2)`
+- Blue: `Color(0.2, 0.4, 0.9)`
+
+All three must produce visually coherent Pudge — same character, different team color
+on skin. If any tint fights the base color or produces muddy results, the skin base is
+wrong (too saturated, wrong hue) and needs repainting.
 
 ---
 
-## 8. Sockets
+## 6. Pivot & Transform
 
-Sockets are implemented as `BoneAttachment3D` nodes on the Godot side, targeting
-the bones listed below. The character-artist is responsible for ensuring the mesh
-geometry is positioned correctly relative to each bone origin so that socket
-offsets are minimal — ideally zero offset if the bone origin is placed with care.
+The transform contract must match the Godot loader's expectations exactly. Any
+mismatch produces tilted, floating, or backwards Pudge in-game. Already a known
+issue today — see Section 12 (Open Questions) for the existing 180° runtime rotation
+that this spec eliminates.
 
-### socket_hook_hand → bone_left_hand
+### World Origin and Feet Plane
 
-- **Position offset from bone origin**: (0.0, 0.0, -0.05) in bone local space.
-  That is: 5 cm forward along the bone's -Z (forward) axis from the palm center.
-  This places the socket at the grip point of the hook handle.
-- **Orientation**: The socket's -Z axis must point in the direction the hook tip
-  faces when carried at rest (forward-left in world space, matching the hook's
-  J-curve forward direction in Silhouette B).
-- **Mesh region**: Must be near the proximal edge of the left hand fist geometry.
-  The hook prop (`mesh_pudge_hook`) is parented here.
-- **Hook prop local transform at raised-arm rest pose**: In A-pose bind, the left
-  arm hangs at ~30 degrees below horizontal. The idle animation layer raises the
-  arm to ~45 degrees above horizontal (Silhouette B pose). At that raised-arm rest
-  position, the hook prop's local rotation relative to `bone_left_hand` is
-  approximately Rotation = (X: -15 deg, Y: 0 deg, Z: 0 deg) — hook tip tilts
-  slightly forward. This rotation is authored in the idle animation clip, not
-  baked into the socket's rest orientation. At bind pose (A-pose), the hook prop
-  simply hangs forward from the palm.
+- **Mesh object origin**: world (0, 0, 0) in Blender.
+- **Feet plane**: the bottom of both boot soles must sit at **Y = 0 in Godot**
+  (which equals **Z = 0 in Blender** before export — Blender uses Z-up).
+- **Skull top (highest point)**: approximately **Y = 1.4 in Godot** (Z = 1.4 in Blender).
+- **Armature root bone** (`Hips`): sits at the character's anatomical hip height,
+  approximately Y = 0.30 in Godot.
 
-### socket_offhand → bone_right_hand
+#### Why pivot at floor between feet
 
-- **Position offset**: (0.0, 0.0, -0.04) in bone local space — 4 cm forward of
-  right palm center.
-- **Orientation**: -Z forward, matching the hand's default forward direction.
-- **Mesh region**: Near the proximal edge of the right hand fist geometry.
-- **Use**: Optional cleaver/secondary attack prop spawn point.
+The `HeroModelBuilder` (`src/gameplay/hero/hero_model_builder.gd:67`) instantiates
+the GLB root directly as a child of the player's `CharacterBody3D` without any
+position offset. The `CharacterBody3D`'s position is the floor point — the capsule
+collider sits above it. Pudge's mesh origin MUST match the floor point or he will
+float or sink relative to the collider.
 
-### socket_chain_origin → bone_chest
+### Forward and Up Axis (Godot World Convention)
 
-- **Position offset**: (-0.08, 0.05, 0.0) in bone local space — 8 cm to the
-  character's left (chain side) and 5 cm upward from the chest bone origin.
-  This places the socket near the upper-left chest, where the chain visually
-  exits the body toward the raised hand.
-- **Orientation**: Aligned to world -Z forward so chain VFX spawns pointing
-  toward the camera direction.
-- **Mesh region**: Upper torso, near the left shoulder/chest junction. The chain
-  link geometry in the body mesh begins here visually.
-- **Use**: Visual chain anchor fallback if the hook hand is offscreen during
-  the hook_throw animation.
+- **Forward axis in Godot world**: **-Z** (negative Z is "facing direction")
+- **Up axis in Godot world**: **+Y**
+- **Right axis in Godot world**: **+X**
 
-### socket_hit_center → bone_spine1
+These are the Godot 4.6 conventions used throughout the codebase, including
+`player_controller.gd` facing logic and the camera setup.
 
-- **Position offset**: (0.0, 0.0, 0.12) in bone local space — 12 cm forward of
-  the Spine1 bone origin, placing the socket at the forward-most point of the
-  belly sphere.
-- **Orientation**: Forward (-Z world). Hit VFX should spray forward/outward.
-- **Mesh region**: The belly equator — maximum gut protrusion point. This is
-  the fattest and most screen-filling part of Pudge at top-down camera angle.
-- **Use**: Damage VFX origin, hit-react impulse reference point.
+### Blender → Godot Export Orientation
 
-### socket_head_top → bone_head
+Pudge is built in Blender, which uses **Z-up, +Y forward**. The GLTF exporter must
+remap axes to Godot world convention:
 
-- **Position offset**: (0.0, 0.18, 0.0) in bone local space — 18 cm above the
-  head bone origin. At 1.4 m total height with a 0.42 m head, the head bone
-  origin sits approximately at the base of the skull; 18 cm up places the socket
-  at the top of the skull dome.
-- **Orientation**: +Y up (default). Status icons float above this point.
-- **Mesh region**: Skull top — the highest geometry point on the model.
-- **Use**: Status effect icons (stun halo, level-up burst, crowd-control indicator).
+| Blender (authoring) | GLTF export setting | Godot (runtime) |
+|---|---|---|
+| +X right | (passthrough) | +X right |
+| +Z up | "Y Up" | +Y up |
+| -Y forward (character faces -Y in Blender front view) | "-Z Forward" | -Z forward |
+
+#### How to build correctly in Blender
+
+The character must be authored so that **his face points along the -Y axis in
+Blender** (so the front view of Blender shows Pudge's face). This is the natural
+default — you look at a character from the front, that's -Y in Blender.
+
+When exported with **"+Y Up, -Z Forward"** glTF settings (Godot 4 defaults), this
+transforms to: Pudge faces -Z in Godot, exactly matching `player_controller.gd`
+expectations.
+
+#### Existing pudge.glb has a 180° rotation bug — this spec fixes it
+
+The current shipped `src/assets/models/heroes/pudge.glb` was exported with the
+character facing the **wrong direction** (+Z in Godot instead of -Z). The
+`HeroModelBuilder` compensates by rotating the GLB root 180° at instantiation
+(`hero_model_builder.gd:74`):
+
+```gdscript
+# GLB exports with the character facing +Z; Godot's forward is
+# -Z (the convention player_controller's facing logic assumes),
+# so flip 180° about Y so the model faces its movement/aim.
+glb_root.rotation.y = PI
+```
+
+**This spec requires the new export to face -Z natively** so the runtime rotation
+becomes unnecessary. The character-artist must build Pudge with face pointing -Y in
+Blender; the blender-specialist must verify -Z forward in Godot import before
+acceptance. After the new GLB lands, the `glb_root.rotation.y = PI` line must be
+**removed** from `HeroModelBuilder` (Stage 10 cleanup item).
+
+### Scale — 1 Unit = 1 Meter
+
+- **1 Blender unit = 1 meter** (Blender's default scene scale).
+- **1 Godot unit = 1 meter** (Godot default).
+- **Apply scale** (Ctrl+A → Scale, or `Object > Apply > Scale`) on **every mesh
+  object and the armature** before export. Non-unity scale baked into the object
+  causes incorrect physics, broken Mixamo retargeting, and unreliable socket positions.
+
+Pudge total height (chibi 3-head-tall):
+- Total height: **1.40 m** (feet at Y=0, skull top at Y≈1.4)
+- Head height: **0.42 m** (30% per chibi ratio — feet of head at chin level ≈ Y 0.98)
+- Belly equator center: approximately **Y = 0.58** with belly radius ~0.28 m
+- Boot top: approximately **Y = 0.10** under gut overhang
+
+The character-artist may adjust ±5% on these values for visual appeal provided the
+3-head-tall read is preserved and feet remain at Y = 0.
+
+### Applied Transforms Checklist
+
+Before export, every object in the Blender scene must satisfy:
+
+| Object | Location | Rotation | Scale |
+|---|---|---|---|
+| `mesh_pudge_body_lod0` | (0, 0, 0) | (0, 0, 0) | (1, 1, 1) |
+| `mesh_pudge_body_lod1` | (0, 0, 0) | (0, 0, 0) | (1, 1, 1) |
+| `mesh_pudge_body_lod2` | (0, 0, 0) | (0, 0, 0) | (1, 1, 1) |
+| `mesh_pudge_hook_lod0` | (0, 0, 0) | (0, 0, 0) | (1, 1, 1) |
+| `mesh_pudge_hook_lod1` | (0, 0, 0) | (0, 0, 0) | (1, 1, 1) |
+| `mesh_pudge_hook_lod2` | (0, 0, 0) | (0, 0, 0) | (1, 1, 1) |
+| `arm_pudge` (armature) | (0, 0, 0) | (0, 0, 0) | (1, 1, 1) |
+| `pudge` (scene root empty) | (0, 0, 0) | (0, 0, 0) | (1, 1, 1) |
+
+**Verification**: the `blender-export-check` skill at `/tools/blender/` will flag
+any non-unity transforms as blockers. Run it before every export.
+
+#### What can go wrong
+
+| Symptom in Godot | Likely cause |
+|---|---|
+| Pudge floats above the floor | Body mesh feet not at Z=0 in Blender — apply origin to floor center, re-export |
+| Pudge sinks into floor | Same — feet are above Z=0; lower the mesh in edit mode before export |
+| Pudge faces backwards (away from movement direction) | Built with face pointing +Y instead of -Y in Blender — flip in edit mode, re-export |
+| Pudge is huge or tiny | Non-unity object scale baked into export. Apply Scale. |
+| Pudge is tilted (head down) | Rotation not applied. Apply Rotation. |
+| Hook prop misaligned with hand | Hook prop object not at (0,0,0) before export. Apply Location. |
 
 ---
 
-## 9. Collision Plan
+## 7. Sockets / Attachment Points
 
-No collision geometry on the visual model. The visual character mesh has no
-`CollisionShape3D` or physics body. All gameplay collision is handled by the
-existing `CapsuleShape3D` on the `CharacterBody3D` node in the game scene.
-Per brief §8, this is confirmed and requires no action from the character-artist.
+Sockets are implemented as `BoneAttachment3D` nodes in Godot, parented to specific
+bones in the imported skeleton. The character-artist's responsibility is to ensure
+the **mesh geometry is positioned correctly relative to each bone origin** so socket
+offsets stay small (ideally zero) — large offsets indicate misaligned bone placement
+that animation will reveal.
 
-Do not author any collision mesh proxy. Do not parent any collision geometry to
-the GLB hierarchy.
+### Bone Naming — Mixamo Convention
+
+This spec uses Mixamo bone names because:
+
+1. The existing `HeroModelBuilder` (`src/gameplay/hero/hero_model_builder.gd:25-46`)
+   already references `mixamorig_*` bone names — no code change required if Pudge's
+   skeleton follows the same convention.
+2. Mixamo provides a free animation library (walk, run, idle, death) compatible with
+   this skeleton — see Stage 9 (Animation).
+3. Godot's glTF importer **sanitizes the colon** in `mixamorig:Name` to underscore at
+   import. So Blender bones authored as `mixamorig:LeftHand` become `mixamorig_LeftHand`
+   in the runtime skeleton. Match the sanitized form in code (already correct).
+
+### Five Sockets
+
+| Socket name | Bone parent (sanitized) | Local Position (m) | Local Rotation (deg) | Purpose |
+|---|---|---|---|---|
+| `socket_hook_hand` | `mixamorig_LeftHand` | (0.05, 0.00, 0.00) | (0, 0, 0) | Hook prop attachment point. The `mesh_pudge_hook` is parented here. Detached at runtime during `hook_throw` animation. |
+| `socket_offhand` | `mixamorig_RightHand` | (0.04, 0.00, 0.00) | (0, 0, 0) | Optional cleaver / secondary attack prop spawn point. |
+| `socket_chain_origin` | `mixamorig_Spine2` | (-0.08, 0.05, 0.00) | (0, 0, 0) | Chain VFX anchor when the hook is offscreen during `hook_throw`. Offset to character's left where the chain visually exits the body. |
+| `socket_hit_center` | `mixamorig_Spine1` | (0.00, 0.00, -0.28) | (0, 0, 0) | Damage VFX origin + hit-react impulse reference point. Placed at forward-most belly equator (Pudge's largest screen-filling part at top-down cam). |
+| `socket_head_top` | `mixamorig_Head` | (0.00, 0.18, 0.00) | (0, 0, 0) | Status effect icon mount (stun halo, level-up burst, CC indicator). Floats above skull dome. |
+
+**Local position interpretation**: positions are in **bone local space**, where the
+bone's +Y axis points along the bone (head → tail). +X and +Z are perpendicular axes
+following Mixamo's bone roll convention.
+
+### Per-Socket World Position at T-Pose Rest (for verification)
+
+The character-artist verifies sockets by checking world-space positions when the
+mesh is in T-pose bind. Expected values:
+
+| Socket | World position at T-pose rest (m) | Verification region in mesh |
+|---|---|---|
+| `socket_hook_hand` | (+0.55, +0.95, +0.05) | At the left palm center, slightly forward (toward -Z when facing -Z) |
+| `socket_offhand` | (-0.55, +0.95, +0.04) | At the right palm center, slightly forward |
+| `socket_chain_origin` | (-0.08, +0.95, +0.00) | Upper chest, left-of-center (concept's chain exit point) |
+| `socket_hit_center` | (+0.00, +0.58, -0.28) | Forward belly equator (most protruding point) |
+| `socket_head_top` | (+0.00, +1.40, +0.00) | Top of skull dome |
+
+The rigger places the bones such that these world positions match the visual
+landmarks. Once bones are placed, sockets' local offsets stay small and stable.
+
+### Hook Prop Behavior — Detail
+
+`mesh_pudge_hook` is parented to `socket_hook_hand` at rest. During the
+`hook_throw` animation:
+
+1. Animation clip drives the LeftHand bone through a throwing motion (wind-up,
+   release frame, recover).
+2. At the **release frame** (Animation Track Event named `hook_release`), gameplay
+   code in `HookSystem.gd` detaches the hook prop from the socket and spawns it as
+   a `RigidBody3D` projectile in world space.
+3. After the projectile mission (hit/miss/return), gameplay code re-parents the
+   hook back to `socket_hook_hand` for the next throw.
+
+The rigger must ensure `mesh_pudge_hook` has **100% weight to `mixamorig_LeftHand`**
+and 0% to all other bones — otherwise the hook will deform incorrectly when detached.
+
+### Idle Animation Pose vs Bind Pose (Silhouette B Implementation)
+
+At T-pose bind, the left hand is at world (+0.55, +0.95, +0.05) — straight out to
+the side. The concept's Silhouette B requires the hook arm to rest at **45° above
+horizontal** (the "Coiled Hook Carry" pose).
+
+This signature pose is delivered by the **idle animation clip**, not the bind pose.
+In idle:
+
+- LeftShoulder rotates ~30° upward (raising shoulder)
+- LeftArm bone rotates ~15° additional (bicep flex)
+- LeftHand world position at idle pose: approximately (+0.50, +1.20, +0.10) — hand
+  raised, hook tip pointing forward-left
+- Hook prop local rotation at idle pose: approximately (-15°, 0°, 0°) in bone local
+  space — hook tip tilts slightly forward (animator detail)
+
+This pose is **baked into the idle clip**, not the rest skeleton. The bind pose
+stays clean T-pose for Mixamo retargeting cleanliness.
+
+### Socket Implementation in Godot
+
+The existing loader (`hero_model_builder.gd:423-446`) handles socket setup:
+
+```gdscript
+static func _setup_hero_sockets(root: Node3D, hero_id: String) -> void:
+    var skeleton: Skeleton3D = _find_first_skeleton(root)
+    for socket_name in HERO_SOCKETS.keys():
+        var spec: Dictionary = HERO_SOCKETS[socket_name]
+        # If skeleton present: BoneAttachment3D bound to spec["bone"]
+        # If no skeleton: Marker3D fallback at spec["position"]
+```
+
+The `HERO_SOCKETS` const at `hero_model_builder.gd:25` must be **updated** with the
+new positions above. Existing values are for the OLD 1.88 m Pudge and do not match
+the new 1.4 m bind. Stage 10 work item.
+
+### Sockets and LODs
+
+Sockets attach to bones, not to specific mesh LODs. As LOD swaps from LOD0 → LOD1 →
+LOD2, the skeleton stays the same — sockets remain attached to bones, no per-LOD
+socket adjustment needed.
+
+At LOD3 (impostor billboard), sockets are not used — visual effects spawn at the
+billboard's world position with no bone targeting.
+
+### Future Sockets (Out of Scope This Spec)
+
+These may be added later but are NOT part of the Stage 5 deliverable:
+
+- `socket_foot_L` / `socket_foot_R` — for footstep VFX origin. Currently footsteps
+  use the player's CharacterBody3D world position, which is good enough.
+- `socket_mouth` — for "spit teeth" emote (post-MVP).
+- `socket_belt_coil` — alternate chain anchor if `socket_chain_origin` proves
+  visually wrong post-animation.
 
 ---
 
-## 10. Naming Convention Table
+## 8. Collision
 
-All Blender objects, mesh data-blocks, materials, armature, and bones follow the
-table below. This is authoritative — downstream tools and the Godot importer rely
-on these exact names. Snake_case for all Blender objects. Bone names use the
-PascalCase convention matching Godot's Humanoid retargeting expectations.
+**No collision geometry on the visual Pudge mesh.** All character collision is
+handled by the existing `CapsuleShape3D` on the `Player`'s `CharacterBody3D` node
+(`src/main.tscn` line 50-51). The visual mesh purely renders — collision is the
+gameplay layer's responsibility.
 
-### Blender Object Names
+### Body Mesh — No Collision Proxy
+
+The character-artist must NOT:
+
+- Author any `CollisionShape3D` or trimesh collision on `mesh_pudge_body_*`
+- Parent collision geometry under the GLB hierarchy
+- Add `-col` / `-colonly` / `-convcol` suffix nodes (Godot import collision hints) to the body mesh
+- Add physics body wrappers
+
+The Godot importer will leave the imported `MeshInstance3D` purely visual, which
+matches the loader's expectations at `hero_model_builder.gd:67-79`.
+
+### Existing Player Collision (Reference Only — Not Part of This Spec)
+
+Documented here so the character-artist knows the collision context:
+
+| Property | Value |
+|---|---|
+| Collision shape | `CapsuleShape3D` |
+| Radius | 0.40 m |
+| Height | 1.60 m |
+| Attached to | `Player/CollisionShape3D` (`main.tscn`) |
+| Capsule pivot | matches `CharacterBody3D` origin |
+
+The capsule is slightly **taller** than Pudge's 1.4 m mesh — this is intentional and
+matches Brawl Stars-style "padded" collision for forgiving gameplay feel. Pudge's
+visual silhouette ends at 1.4 m; the capsule extends to 1.6 m to give buffer for
+hit detection.
+
+### Hook Prop — Separate Collision Concern
+
+`mesh_pudge_hook` (the attached prop) has **no collision** while attached to the
+socket. The hook is purely visual on the character.
+
+When the hook is **detached as a projectile** during `hook_throw`, the gameplay
+system (`HookSystem.gd`) wraps the hook mesh in a `RigidBody3D` or `Area3D` with
+its OWN collision shape — typically a small `CapsuleShape3D` or `SphereShape3D`
+covering the hook's J-curve. That collision shape is gameplay state, NOT part of
+the model export.
+
+The character-artist's deliverable is just the visual mesh. The gameplay-programmer
+adds projectile collision at runtime.
+
+### LOD Collision
+
+No LOD-specific collision. Same null collision contract applies to LOD0, LOD1,
+LOD2, and the impostor billboard. Player collision capsule is constant regardless
+of which mesh LOD is active.
+
+### Why This Is Important
+
+Authoring trimesh collision from a 6,000-tri character would add:
+- 6,000-tri physics shape (expensive — Bullet/Jolt prefer convex hulls or primitives)
+- Per-instance collision baking on import
+- Confusing collision in editor
+
+The capsule approach gives **predictable, performant, gameplay-feel-tunable** collision.
+Trimesh-on-character is an antipattern at this scale.
+
+---
+
+## 9. Deformation (Rigged Asset)
+
+The modeling-stage view of the rig. The full rigging specification (weight painting
+strategy, IK chains, animation constraints) belongs to Stage 8 (`design/gdd/rigs/pudge.md`).
+Here we lock the **bone count** and **deformation-critical topology** so retopo
+(Stage 5) builds the right edge flow for the rig that follows.
+
+### Skeleton — Mixamo-Compatible
+
+**Total bones: 20-25** depending on optional features (BellyJiggle required, Jaw +
+chain bones optional). All bones use Mixamo naming convention.
+
+**In Blender authoring**: bones named `mixamorig:BoneName` (with colon).
+**After Godot glTF import**: sanitized to `mixamorig_BoneName` (underscore).
+
+#### Bone hierarchy (required)
+
+```
+pudge (scene root empty — not a bone)
+└── arm_pudge (armature object)
+    └── mixamorig:Hips                      [root bone]
+        ├── mixamorig:Spine                 [lower spine]
+        │   └── mixamorig:Spine1            [upper spine / belly anchor]
+        │       ├── mixamorig:Spine2        [chest]
+        │       │   ├── mixamorig:Neck      [compressed neck stub — see §3]
+        │       │   │   └── mixamorig:Head  [skull]
+        │       │   │       └── mixamorig:Jaw (OPTIONAL)
+        │       │   ├── mixamorig:LeftShoulder
+        │       │   │   └── mixamorig:LeftArm
+        │       │   │       └── mixamorig:LeftForeArm
+        │       │   │           └── mixamorig:LeftHand
+        │       │   │               └── (chain bones if used — see below)
+        │       │   └── mixamorig:RightShoulder
+        │       │       └── mixamorig:RightArm
+        │       │           └── mixamorig:RightForeArm
+        │       │               └── mixamorig:RightHand
+        │       └── mixamorig:BellyJiggle   [REQUIRED — secondary motion]
+        ├── mixamorig:LeftUpLeg
+        │   └── mixamorig:LeftLeg
+        │       └── mixamorig:LeftFoot
+        └── mixamorig:RightUpLeg
+            └── mixamorig:RightLeg
+                └── mixamorig:RightFoot
+```
+
+#### Standard Mixamo bones (20 required)
+
+| Bone | Role | Notes |
+|---|---|---|
+| `mixamorig:Hips` | Pelvis root | Armature root bone. Always at world (0, ~0.30, 0) in T-pose. |
+| `mixamorig:Spine` | Lower spine | Connects hips to belly. |
+| `mixamorig:Spine1` | Upper spine / belly anchor | **`BellyJiggle` parent.** Weight-paint origin for the gut. |
+| `mixamorig:Spine2` | Chest | `socket_chain_origin` target. |
+| `mixamorig:Neck` | Compressed neck stub | **Constrained to ±5° max rotation** per §3 (no-neck hunch). |
+| `mixamorig:Head` | Skull | Drives head rotation. `socket_head_top` target. |
+| `mixamorig:LeftShoulder` | Hook arm clavicle | Reaches into deltoid mass (positioned at ±0.30 X per Stage 2 work). |
+| `mixamorig:LeftArm` | Hook arm upper | Rotates ~30° upward in idle (Silhouette B). |
+| `mixamorig:LeftForeArm` | Hook arm lower | Bends during `hook_throw` wind-up. |
+| `mixamorig:LeftHand` | Hook hand | `socket_hook_hand` target. Holds the hook prop. |
+| `mixamorig:RightShoulder` | Cleaver arm clavicle | Reaches into right deltoid. |
+| `mixamorig:RightArm` | Right upper arm | Standard motion. |
+| `mixamorig:RightForeArm` | Right forearm | Drives `attack_basic` swing. |
+| `mixamorig:RightHand` | Right hand | `socket_offhand` target. |
+| `mixamorig:LeftUpLeg` | Left thigh | |
+| `mixamorig:LeftLeg` | Left shin | |
+| `mixamorig:LeftFoot` | Left foot / boot | Footstep timing reference. |
+| `mixamorig:RightUpLeg` | Right thigh | |
+| `mixamorig:RightLeg` | Right shin | |
+| `mixamorig:RightFoot` | Right foot / boot | |
+
+#### Custom Pudge bones
+
+| Bone | Required? | Parent | Role |
+|---|---|---|---|
+| `mixamorig:BellyJiggle` | **YES** | `mixamorig:Spine1` | Drives gut bounce in idle, walk, run, death. Spring-driven via Godot 4.6 `SkeletonModification3D` if available, else keyframed. Influence painted via `jiggle_boundary` vertex color (§3). |
+| `mixamorig:Jaw` | Optional | `mixamorig:Head` | Drives mouth open for `taunt` and `death` (gape). Cut if `taunt` is descoped from MVP. |
+| `mixamorig:ChainLink1` | Optional | `mixamorig:LeftHand` | First belt-chain link. |
+| `mixamorig:ChainLink2` | Optional | `mixamorig:ChainLink1` | Second link. |
+| `mixamorig:ChainLink3` | Optional | `mixamorig:ChainLink2` | Third link. |
+| `mixamorig:ChainLink4` | Optional | `mixamorig:ChainLink3` | Fourth link (closest to belt). Spring-driven for organic sway if Godot's `SkeletonModification3D` supports it. |
+
+#### Total bone count summary
+
+| Configuration | Bones | When to use |
+|---|---|---|
+| **Minimum** (no Jaw, no chain) | **21** (20 Mixamo + BellyJiggle) | If Jaw and chain sway are descoped. Most lean. |
+| **MVP** (Jaw, no chain) | **22** | MVP shipping target. Jaw enables taunt and death gape. |
+| **Full** (Jaw + chain bones) | **25** | Best visual fidelity. Chain sway enriches idle. |
+
+**Recommended for MVP**: 22 bones (minimum + BellyJiggle + Jaw). Chain bones added
+post-MVP if profiling allows.
+
+### Blendshapes / Shape Keys
+
+**MVP target: zero blendshapes.** The chibi style and bone-driven animation cover
+all required deformation. Blendshapes are added ONLY if rigging Stage 8 reveals
+unfixable joint deformation.
+
+#### Conditional blendshapes (added IF needed)
+
+| Shape Key | Trigger condition | Driver |
+|---|---|---|
+| `correct_leftarm_raised` | If 4-loop left shoulder pinches at the Silhouette B 45° raise (test in Stage 8 QA pose QA1) | Driven by `mixamorig:LeftArm` Z-axis rotation, blends in 0 → 1 as arm raises 0° → 45° |
+| `eye_blink_L`, `eye_blink_R` | If eye blink polish is added at Polish phase | Per-eye blink animation curve in idle clip |
+| `mouth_open_taunt` | If `Jaw` bone alone is insufficient for the taunt gape | Driven by `taunt` animation clip directly |
+
+**Decision rule for the character-artist**: do NOT speculatively author blendshapes.
+Wait until the rigger flags pinching. Authoring blendshapes "just in case" adds
+mesh data overhead (each shape duplicates vertex positions) for features that may
+never trigger.
+
+### Critical Edge Loop Placement
+
+Reference §3 for loop COUNT. This section locks LOOP POSITION relative to bone joints.
+
+**Rule**: every deformation loop must be **perpendicular to the bone's primary
+rotation axis** at the joint. A loop angled relative to the rotation axis pinches
+or shears on rotation.
+
+#### Per-joint placement targets
+
+| Joint | Bone rotation axis | Loop orientation | Placement Z (T-pose) |
+|---|---|---|---|
+| **Left shoulder** | Around Z (raise/lower) | Vertical loops perpendicular to bone direction | 0.92-0.98 m (4 loops span 6 cm) |
+| **Right shoulder** | Around Z (limited raise) | Vertical loops | 0.92-0.98 m (3 loops) |
+| **Left elbow** | Around Z (bend) | Loops perpendicular to upper-arm direction | 0.75-0.82 m (3 loops span 7 cm) |
+| **Right elbow** | Around Z (bend) | Same | 0.75-0.82 m (3 loops) |
+| **Wrists** | Around bone Y (twist) | Loops perpendicular to forearm | 0.60-0.65 m (2 loops) |
+| **Hips** | Around X (forward/back) + Z (sway) | Loops around pelvis circumference | 0.27-0.33 m (4 loops span 6 cm) |
+| **Knees** | Around X (bend) | Loops perpendicular to thigh direction | 0.12-0.18 m (3 loops) |
+| **Ankles** | Around X (toe lift) | Loops at ankle pivot point | 0.05-0.10 m (2 loops) |
+| **Mouth** | Around X (jaw open) | Concentric loops around mouth opening | At mouth center, expanding outward |
+| **Eyes** | (cosmetic only — no bone rotation) | Concentric loops around eye center | At each eye center |
+
+#### What "perpendicular to rotation axis" means in practice
+
+For a typical arm bone running roughly along world-X in T-pose (Pudge's arm horizontal):
+- Bone rotates around world-Z (raise/lower) and world-Y (rotation along arm length)
+- Deformation loops at the joint should be **rings around world-X** — i.e. vertical
+  rings circling the arm
+- A loop oriented IN the world-XZ plane would NOT deform correctly — it would shear
+
+The retopologist must visualize the bone direction and place loops as rings around it.
+
+### Skinning Method (Stage 8 Reference)
+
+The rigging-animator's job; included here for retopo context:
+
+- **Method**: Voxel Heat Diffusion (Mixamo Auto-Skin) for initial pass, manual weight
+  paint cleanup for shoulder + belly regions
+- **Max influences per vertex**: 4 (Godot 4.6 mobile renderer limit)
+- **BellyJiggle weight cap**: 80% (rigger applies cap on top of vertex color paint;
+  remaining 20% goes to Spine1)
+- **Hook prop**: 100% to `mixamorig:LeftHand`, 0% to all other bones (clean detach)
+
+The retopologist's deliverable to the rigger:
+
+- [ ] Mesh with quad-dominant topology meeting §3 loop counts
+- [ ] `jiggle_boundary` vertex color layer painted per §3 specification
+- [ ] T-pose bind position validated against §6 transform contract
+- [ ] No skeleton present yet — rigging-animator builds the armature in Stage 8
+
+### Bone Influence Boundaries
+
+Critical bone-to-mesh mapping (rigger uses as starting point):
+
+| Mesh region | Primary bone | Secondary bone | Vertex group hint |
+|---|---|---|---|
+| Head + face | `Head` | `Neck` (5%) | `head_only` |
+| Neck stub | `Neck` | `Spine2` (50%) — bidirectional blend | (boundary loop) |
+| Belly equator | `BellyJiggle` (80%) | `Spine1` (20%) | `jiggle_boundary` red region |
+| Belly transitions | `BellyJiggle` (40%) | `Spine1` (60%) | `jiggle_boundary` yellow region |
+| Belly upper / lower seam | `Spine1` (100%) | — | `jiggle_boundary` white region |
+| Hook arm shoulder | `LeftShoulder` | `LeftArm` (35%), `Spine2` (15%) | (deltoid region) |
+| Hook arm bicep | `LeftArm` | `LeftShoulder` (20%), `LeftForeArm` (10%) | |
+| Hook arm forearm | `LeftForeArm` | `LeftArm` (15%), `LeftHand` (10%) | |
+| Hook hand | `LeftHand` | `LeftForeArm` (10%) | |
+| Right arm (mirror) | mirror of left | | |
+| Hips region | `Hips` | `Spine` (25%), `LeftUpLeg` (15%), `RightUpLeg` (15%) | |
+| Legs | `*UpLeg` → `*Leg` → `*Foot` chain | | standard |
+
+These are **starting weights** — the rigger refines via paint mode based on
+deformation testing in Stage 8.
+
+---
+
+## 10. Mesh Layout / Object Hierarchy
+
+### Decision: Two skinned meshes + scene root empty
+
+**3 objects in the Blender scene at LOD0** (plus LOD1, LOD2 duplicates):
+
+```
+pudge                                (Empty — scene root, no mesh)
+├── mesh_pudge_body_lod0             (Skinned mesh: torso, head, arms, hands, legs,
+│                                     boots, belt, apron, chain links, eyes — ALL joined)
+├── mesh_pudge_hook_lod0             (Skinned mesh: hook prop + 1-2 welded chain links)
+└── arm_pudge                        (Armature — skeleton)
+    ├── mixamorig:Hips
+    └── ... (full bone tree per §9)
+```
+
+### Why one body mesh and a separate hook
+
+| Component | Decision | Rationale |
+|---|---|---|
+| Body (torso/head/arms/legs/boots/belt/chain/eyes) | **Joined into single mesh** | Single draw call. Single material (`mat_pudge_body`). All share the 1024 atlas. |
+| Hook prop | **Separate mesh** | Needs to be DETACHABLE during `hook_throw` (per §7). Own material (`mat_pudge_hook`) and own 512 atlas. |
+| Eyes | **MERGED into body mesh** | Cost of separation: extra draw call + separate material. Cost of merging: zero. Emissive eye region painted on the body atlas's emissive map sub-region. |
+| Belt chain (hand → hip drape) | **MERGED into body mesh** | Skinned to chain bones (if enabled). Shares body atlas. |
+| Hook-adjacent chain (1-2 links welded to hook) | **MERGED into hook mesh** | These travel with the hook as projectile — must be part of hook mesh. |
+
+**Total draw calls per Pudge instance**: 2 (body + hook).
+
+### Why NOT separate eye spheres
+
+Tempting decision avoided. Separating eyes would require:
+
+- ❌ Third material slot → third draw call (10 heroes × 3 = 30 draw calls just for characters)
+- ❌ Separate eye atlas (or compete for body atlas space)
+- ❌ Extra parenting logic to keep eyes glued to face during animation
+
+Keeping eyes merged with `mesh_pudge_body_lod0`:
+
+- ✅ Eyes ride with the head bone (weighted to `mixamorig_Head` 100%)
+- ✅ Emissive painted on the body atlas's emissive sub-region (256x256 cropped)
+- ✅ 1 draw call, 1 material
+
+Eye asymmetry (left ~15% larger) is **baked into the sculpt geometry** before joining
+to body, not handled via separate objects.
+
+### Why NOT submesh-split for masking
+
+Some pipelines split character into "head", "body", "limbs" submeshes for mix-and-match
+customization. Pudge has no customization (single hero, single look) — splitting adds
+draw calls with no gameplay benefit.
+
+### Naming Convention — Authoritative
+
+ALL Blender object, data-block, material, and file names must follow these patterns.
+Downstream tools (Godot importer, `HeroModelBuilder` loader, `blender-export-check`
+script) match on these exact names. Spelling matters.
+
+#### Blender Objects
 
 | Object type | Blender object name | Notes |
 |---|---|---|
-| Scene root (empty) | `pudge` | Parent of all objects. No mesh. |
-| Body mesh | `mesh_pudge_body` | Contains all body geometry: torso, head, arms, hands, legs, boots, belt, chain, eyes, apron stub. |
-| Hook prop mesh | `mesh_pudge_hook` | Hook J-curve + 1-2 immediately adjacent chain links. Separate draw call. |
-| Armature | `arm_pudge` | Skeleton. Parented at world origin. |
+| Scene root | `pudge` | Empty. Parent of all hierarchy. |
+| Body mesh LOD0 | `mesh_pudge_body_lod0` | All body geometry joined. |
+| Body mesh LOD1 | `mesh_pudge_body_lod1` | Reduced topology per §2. |
+| Body mesh LOD2 | `mesh_pudge_body_lod2` | Further reduced per §2. |
+| Hook mesh LOD0 | `mesh_pudge_hook_lod0` | Hook + 1-2 welded chain links. |
+| Hook mesh LOD1 | `mesh_pudge_hook_lod1` | |
+| Hook mesh LOD2 | `mesh_pudge_hook_lod2` | |
+| Armature | `arm_pudge` | Skeleton. |
+| LOD0 collection (optional) | `pudge_lod0` | If LODs grouped by collection. |
+| LOD1 collection (optional) | `pudge_lod1` | |
+| LOD2 collection (optional) | `pudge_lod2` | |
 
-### Mesh Data-Block Names
+**LOD suffix is mandatory.** Godot's glTF importer auto-detects `_lod0`, `_lod1`,
+`_lod2` suffixes and configures LOD switching automatically. Missing suffix = no LOD
+detected = manual import setup required.
 
-| Mesh data | Name | Notes |
-|---|---|---|
-| Body mesh data | `mesh_data_pudge_body` | Blender internal mesh data-block. Rename after final join. |
-| Hook mesh data | `mesh_data_pudge_hook` | |
+#### Mesh Data-Blocks
 
-### Material Names
+Mesh data-blocks (internal Blender mesh data) follow the same name as the object,
+just with `_data` appended where they aren't auto-generated:
 
-| Material | Name | Atlas size | Notes |
+| Object | Mesh data-block name |
+|---|---|
+| `mesh_pudge_body_lod0` | `mesh_data_pudge_body_lod0` |
+| `mesh_pudge_body_lod1` | `mesh_data_pudge_body_lod1` |
+| `mesh_pudge_body_lod2` | `mesh_data_pudge_body_lod2` |
+| `mesh_pudge_hook_lod0` | `mesh_data_pudge_hook_lod0` |
+| `mesh_pudge_hook_lod1` | `mesh_data_pudge_hook_lod1` |
+| `mesh_pudge_hook_lod2` | `mesh_data_pudge_hook_lod2` |
+| `arm_pudge` | `arm_data_pudge` |
+
+Rename mesh data-blocks after final Join operation in Blender. Auto-generated names
+like `Mesh.001` are blockers — fail the export check.
+
+#### Materials
+
+| Material | Name | Atlas | Notes |
 |---|---|---|---|
-| Body material | `mat_pudge_body` | 1024x1024 | Applied to `mesh_pudge_body`. All body regions. |
-| Hook material | `mat_pudge_hook` | 512x512 | Applied to `mesh_pudge_hook` only. |
+| Body | `mat_pudge_body` | 1024×1024 | Custom tint shader. Applied to `mesh_pudge_body_*`. |
+| Hook | `mat_pudge_hook` | 512×512 | Standard PBR. Applied to `mesh_pudge_hook_*`. |
 
-### Bone Names (Armature)
+#### Textures (output for texture-artist)
 
-Bone names must match the brief §5 required bone list exactly. Listed here for
-reference with the snake_case file convention noted — bones use PascalCase to
-match Godot retargeting.
+Path: `src/assets/models/heroes/textures/`
 
-| Bone name | Role | Notes |
+| File | Resolution | Material slot |
 |---|---|---|
-| `Hips` | Pelvis root | |
-| `Spine` | Lower spine | |
-| `Spine1` | Upper spine / belly anchor | Belly jiggle bone weighted from here |
-| `Chest` | Chest / socket_chain_origin target | |
-| `Neck` | Compressed neck stub | Very short; see topology plan |
-| `Head` | Skull | |
-| `LeftShoulder` | Left shoulder | Hook arm side |
-| `RightShoulder` | Right shoulder | |
-| `LeftArm` | Left upper arm | |
-| `RightArm` | Right upper arm | |
-| `LeftForeArm` | Left forearm (chunkier) | |
-| `RightForeArm` | Right forearm | |
-| `LeftHand` | Left hand / socket_hook_hand target | |
-| `RightHand` | Right hand / socket_offhand target | |
-| `LeftUpLeg` | Left thigh | |
-| `RightUpLeg` | Right thigh | |
-| `LeftLeg` | Left shin | |
-| `RightLeg` | Right shin | |
-| `LeftFoot` | Left foot / boot | |
-| `RightFoot` | Right foot / boot | |
-| `BellyJiggle` | Belly secondary motion | Child of Spine1; drives gut bounce |
-| `Jaw` | Jaw | Optional; used in taunt/death |
-| `ChainLink1` | Chain link closest to hand | Child of LeftHand |
-| `ChainLink2` | Second chain link | Child of ChainLink1 |
-| `ChainLink3` | Third chain link | Child of ChainLink2 |
-| `ChainLink4` | Fourth chain link / belt coil | Child of ChainLink3 |
+| `pudge_body_basecolor.png` | 1024×1024 RGBA | `mat_pudge_body` albedo (RGB) + tint mask (A) |
+| `pudge_body_normal.png` | 1024×1024 RG | `mat_pudge_body` normal (RG, B reconstructed) |
+| `pudge_body_orm.png` | 1024×1024 RGB | `mat_pudge_body` AO+roughness+metallic |
+| `pudge_body_emissive.png` | 256×256 RGB | `mat_pudge_body` emissive (eyes only, cropped) |
+| `pudge_hook_basecolor.png` | 512×512 RGB | `mat_pudge_hook` albedo |
+| `pudge_hook_normal.png` | 512×512 RG | `mat_pudge_hook` normal |
+| `pudge_hook_orm.png` | 512×512 RGB | `mat_pudge_hook` AO+roughness+metallic |
+| `pudge_body_basecolor_ai_projection.png` | 1024×1024 RGB | **Reference only** — AI mesh's projected colors. NOT FINAL. Labeled clearly in handoff. |
 
-### Texture File Names (output for texture-artist)
+#### Output GLB Files (Stage 10)
 
-| File | Resolution | Notes |
+| File | Path | Purpose |
 |---|---|---|
-| `pudge_body_basecolor.png` | 1024x1024 | Hand-painted base color |
-| `pudge_body_normal.png` | 1024x1024 | Tangent-space normal map baked from high-poly |
-| `pudge_body_orm.png` | 1024x1024 | ORM channel pack: R=AO, G=Roughness, B=Metallic |
-| `pudge_body_emissive.png` | 1024x1024 | Eye emissive only; rest is black |
-| `pudge_hook_basecolor.png` | 512x512 | Hook prop base color |
-| `pudge_hook_normal.png` | 512x512 | Hook prop normal |
-| `pudge_hook_orm.png` | 512x512 | Hook prop ORM |
+| Body + skeleton | `src/assets/models/heroes/pudge.glb` | Loaded by `HeroModelBuilder` as `<hero_id>.glb` |
+| Hook prop | `src/assets/models/heroes/pudge_hook.glb` | Loaded by `HeroModelBuilder` as `<hero_id>_hook.glb` |
 
-### Output File Names
+**Loader path constants** (already exist in `hero_model_builder.gd:15-16`):
 
-| File | Path | Notes |
+```gdscript
+const HERO_GLB_PATH      := "res://assets/models/heroes/%s.glb"
+const HERO_HOOK_GLB_PATH := "res://assets/models/heroes/%s_hook.glb"
+```
+
+For hero_id `pudge`, these resolve to the two paths above. No code change needed
+for the new exports — only ensure the file names match.
+
+#### Working .blend File
+
+| File | Path | Purpose |
 |---|---|---|
-| Final GLB | `src/assets/models/heroes/pudge.glb` | Overwrites placeholder per brief §9 |
-| Working Blender file | `tools/blender/pudge.blend` | Canonical working file; not exported to Godot |
+| Working .blend | `src/assets/models/heroes/anime_pudge.blend` | Current authoring file (continue using during Stages 4-9) |
+| Canonical .blend (optional) | `tools/blender/pudge.blend` | If we want a separate "clean handoff" copy with all WIP collections removed. Decision at Stage 10. |
+
+### Collections in Blender (Organization)
+
+The Blender .blend file should organize objects into collections for clarity:
+
+```
+Scene Collection
+├── PUDGE_NEW_BUILD (current work — exports from here)
+│   ├── pudge (scene root empty)
+│   ├── mesh_pudge_body_lod0
+│   ├── mesh_pudge_body_lod1
+│   ├── mesh_pudge_body_lod2
+│   ├── mesh_pudge_hook_lod0
+│   ├── mesh_pudge_hook_lod1
+│   ├── mesh_pudge_hook_lod2
+│   └── arm_pudge
+├── PUDGE_REFERENCE (hidden — bake source + props snapshots)
+│   ├── textured_mesh_bake_hp (high-poly bake target)
+│   ├── prop_hook_snapshot (red — Stage 2 reference)
+│   └── prop_blade_snapshot (blue — Stage 2 reference)
+└── PUDGE_OLD_REFERENCE (hidden — preserved historical attempts)
+    └── [previous textured_mesh, OLD mesh_pudge_body_lod0, OLD arm_pudge]
+```
+
+Only `PUDGE_NEW_BUILD` is exported. The export script must filter to this collection.
+
+### What Else NOT to Export
+
+Confirmed excluded from final `.glb`:
+
+- ❌ Reference markers (`REF_*` objects from Stage 2 reference rig)
+- ❌ Helper armatures (`pose_helper_armature` — already deleted in Stage 2)
+- ❌ Backup meshes (`pudge_v2_basemesh`, `pudge_v2_remesh` — bake source only)
+- ❌ High-poly bake source (`textured_mesh_bake_hp` — Stage 7 input, not shipped)
+- ❌ Snapshot props (`prop_hook_snapshot`, `prop_blade_snapshot` — Stage 2 reference)
+- ❌ Cameras and lights from the Blender scene (Godot has its own)
 
 ---
 
-## 11. Open Questions for Next Stages
+## 11. Deliverables
 
-### For texture-artist (Stage 4)
+Everything that must exist before Pudge is considered "shipped" for this spec.
+This is the **acceptance checklist** for the character-artist's handoff.
 
-1. **Apron blood density**: The apron stub shares the belt UV region on the body
-   atlas. Confirm you have enough texel budget to paint legible blood staining
-   on the apron face at 256 px/m density — the island will be small. If it is
-   under 32x32 px in the atlas, consider whether the blood reads or becomes noise.
-   Raise this before starting paint, not after.
+### A. Working File
 
-2. **Team tint base color validation**: Verify the desaturated skin base (`#8A8A7A`
-   per concept material table) reads correctly under all three team tint channels
-   (green `Color(0.5, 0.8, 0.2)`, red, blue). The base must not already be green.
-   Test the shader tint uniform before painting any facial features — getting the
-   base wrong invalidates all subsequent skin work.
+- [ ] `src/assets/models/heroes/anime_pudge.blend` saved with:
+  - [ ] `PUDGE_NEW_BUILD` collection contains all 8 export objects (3 body LODs, 3 hook LODs, armature, scene root empty)
+  - [ ] `PUDGE_REFERENCE` collection contains the high-poly bake source (`textured_mesh_bake_hp`) and snapshot props
+  - [ ] `PUDGE_OLD_REFERENCE` collection contains preserved historical attempts (read-only — don't touch)
+  - [ ] All blend file external dependencies packed (`File > External Data > Pack All Into Blend`)
+  - [ ] File size under 200 MB
 
-3. **Eye emissive boundary**: The emissive map should contain only the sclera
-   region. The pupil is NOT emissive (near-black matte per concept material table).
-   If the emissive island bleeds into the pupil area even by a few pixels, the eye
-   will glow incorrectly. Confirm the UV island for the eye sclera is padded 8+px
-   from the pupil sub-region.
+### B. Export Files (.glb)
 
-4. **Stitch geometry decision**: This spec does not author stitches as modeled
-   geometry (they are painted detail). If the texture-artist finds that 256 px/m
-   on the torso front does not give enough resolution for stitch detail at top-down
-   12m camera distance, flag this before finalizing the UV layout — we may need to
-   increase face density or use a stitch decal approach.
+- [ ] `src/assets/models/heroes/pudge.glb` — body + skeleton + animations
+  - [ ] Contains 3 body LODs (`mesh_pudge_body_lod0`, `_lod1`, `_lod2`)
+  - [ ] Contains armature (`arm_pudge`) with all 22 MVP bones (or 21/25 if Jaw/chain config differs)
+  - [ ] Contains AnimationLibrary with 10 clips (see §C.4 below)
+  - [ ] Forward axis = -Z in Godot (Pudge faces movement direction natively, no runtime rotation needed)
+  - [ ] Feet at Y = 0
+  - [ ] Total height ≈ 1.40 m
+  - [ ] Scale (1, 1, 1) on all objects and bones
+  - [ ] File size under 5 MB
+- [ ] `src/assets/models/heroes/pudge_hook.glb` — detachable hook prop
+  - [ ] Contains 3 hook LODs (`mesh_pudge_hook_lod0`, `_lod1`, `_lod2`)
+  - [ ] 100% weighted to `mixamorig:LeftHand` bone (in skeleton inherited from body GLB)
+  - [ ] File size under 1 MB
 
-5. **Combined AO bake requirement**: AO for both `mat_pudge_body` and
-   `mat_pudge_hook` must be baked in the same Blender scene with both meshes
-   present. The hand-to-hook contact area will have incorrect AO if baked
-   separately. This is a workflow coordination item between character-artist
-   (who sets up the bake scene) and texture-artist (who may re-bake if painting
-   requires it).
+### C. Texture Files
 
-### For rigging-animator (Stage 5)
+Path: `src/assets/models/heroes/textures/`
 
-1. **BellyJiggle bone influence boundary**: The character-artist will mark the
-   jiggle influence boundary on the retopo mesh using vertex color or annotation.
-   The rigger must request this annotation before weight painting. The boundary is:
-   100% influence on the belly equator ring and lower forward rings; 0% at the
-   torso-join rings above the equator and at the hip-pelvis join below.
+#### C.1 Final body atlas (1024 × 1024)
 
-2. **Neck bone range of motion**: The Neck bone has near-zero useful rotation range
-   due to the no-neck hunch topology. The rigger must constrain the Neck bone to
-   a maximum of 5 degrees rotation in any axis to prevent topology shear at the
-   skull-trapezius join. Head rotation is driven by the Head bone, not Neck.
+- [ ] `pudge_body_basecolor.png` (RGBA — RGB = hand-painted base, A = tint mask)
+- [ ] `pudge_body_normal.png` (RG — tangent-space normal, baked from `textured_mesh_bake_hp`)
+- [ ] `pudge_body_orm.png` (RGB — R=AO baked in combined-scene, G=Roughness, B=Metallic)
 
-3. **ChainLink bones vs. animation layer**: The spec authors ChainLink1-4 as child
-   bones of LeftHand. At LOD0 these drive the 4 visible chain link meshes with an
-   organic sway in idle. The rigger should evaluate whether a spring-based Godot
-   4.6 SkeletonModification3D modifier can auto-drive chain sway rather than
-   keyframing it in every animation clip. If spring modification is used, the chain
-   link bones must be excluded from animation clips and driven exclusively by the
-   modifier at runtime.
+#### C.2 Final eye emissive (256 × 256, cropped)
 
-4. **Hook prop weight paint confirmation**: `mesh_pudge_hook` must have 100% weight
-   to `LeftHand` and 0% to all other bones. Confirm before delivery to
-   blender-specialist. If any other bone has non-zero weight on the hook mesh, the
-   hook prop will deform incorrectly when separated as a projectile.
+- [ ] `pudge_body_emissive.png` (RGB — black except eye sclera region per concept material table)
 
-5. **Left shoulder 4-loop deformation test**: The hook arm raises to approximately
-   45 degrees above horizontal in the idle animation layer. Test this full raise
-   in Blender before handoff — the 4-loop shoulder should hold clean without
-   pinching. If it pinches, add a corrective blendshape at the raised-arm position.
-   Flag any corrective shapes to the character-artist to ensure they are included
-   in the final blend file.
+#### C.3 Final hook atlas (512 × 512)
 
-6. **Jaw bone usage**: The Jaw bone is listed as optional in the brief (for taunt
-   and death). If the taunt stretch goal is cut, the Jaw bone may be omitted.
-   Confirm scope with the user before rigging — an unused bone in the export adds
-   unnecessary data to the AnimationLibrary.
+- [ ] `pudge_hook_basecolor.png` (RGB)
+- [ ] `pudge_hook_normal.png` (RG)
+- [ ] `pudge_hook_orm.png` (RGB — combined-scene AO bake)
 
-### For blender-specialist (Stage 7)
+#### C.4 Reference (NOT FINAL)
 
-1. **Export orientation verification**: Forward = -Z, Up = +Y in the GLTF export
-   settings. Verify with the `blender-export-check` skill at `/tools/blender/`.
-   Pudge's forward belly protrusion will be immediately obvious if the axis is
-   wrong — a sideways-facing Pudge in Godot is the failure signature.
+- [ ] `pudge_body_basecolor_ai_projection.png` (RGB) — AI-mesh projected color, labeled in handoff notes as "REFERENCE ONLY — DO NOT SHIP"
 
-2. **Transforms applied check**: All objects (`mesh_pudge_body`, `mesh_pudge_hook`,
-   `arm_pudge`) must have location=(0,0,0), rotation=(0,0,0), scale=(1,1,1) in
-   object mode before export. The blender-export-check skill must flag any non-unity
-   scale as a blocker.
+#### C.5 Texture validation
 
-3. **LOD object naming for Godot import**: Godot's LOD import system requires mesh
-   objects to be named with `_lod0`, `_lod1`, `_lod2` suffixes. The LOD objects
-   in the blend file must be named `mesh_pudge_body_lod0`, `mesh_pudge_body_lod1`,
-   `mesh_pudge_body_lod2`, and similarly for the hook prop. Confirm this before
-   export to avoid a manual re-import pass.
+- [ ] Each PNG passes UV-checker visualization (no stretched / missing islands)
+- [ ] Body atlas passes 3-tint validation (green/red/blue uniform produces coherent Pudge — §5)
+- [ ] Normal maps verified in Godot at LOD0 distance — no obvious cage leaks at belly, shoulder, eye socket
+- [ ] Emissive map painted only on eye sclera (not pupil, not surrounding skin)
 
-4. **AnimationLibrary clip names**: All 10 animation clips (per brief §4) must be
-   named exactly: `idle`, `walk`, `run`, `turn_in_place`, `hook_throw`,
-   `hook_recover`, `attack_basic`, `hit_react`, `death`, `victory`. The Godot
-   loader and AnimationTree expect these exact strings. A mismatch silently breaks
-   animation blending with no error at import time.
+### D. Animation Library (Stage 9 output — listed here for completeness)
+
+Required clips in the `pudge.glb` AnimationLibrary, named exactly:
+
+- [ ] `idle` — Silhouette B raised-hook-arm rest pose, belly jiggle, subtle breathing
+- [ ] `walk` — chibi waddle, ~1.4 m/s reference speed
+- [ ] `run` — faster waddle with more belly bounce, ~3.5 m/s
+- [ ] `turn_in_place` — root-stationary rotation
+- [ ] `hook_throw` — wind-up + release frame with `hook_release` animation event marker
+- [ ] `hook_recover` — return-to-idle blend
+- [ ] `attack_basic` — cleaver swing with right arm
+- [ ] `hit_react` — flinch + recoil
+- [ ] `death` — fall backward with gut deflate (last)
+- [ ] `victory` — pose with raised hook + grunt
+
+These clip names match `HeroModelBuilder` expectations and the AnimationTree state
+machine (Stage 10).
+
+### E. Vertex Color Layers
+
+Layer name: `jiggle_boundary` (exact string). **Encoding per contract §6 — 2-color (red/white) with linear gradient between, NOT the 3-color (red/yellow/white) form authored previously.**
+
+- [ ] Layer present on `mesh_pudge_body_lod0`
+- [ ] Layer present on `mesh_pudge_body_lod1`
+- [ ] Layer present on `mesh_pudge_body_lod2` (re-painted post-decimate per §3)
+- [ ] Color domain = Vertex
+- [ ] Data type = Byte Color or Float Color
+- [ ] Red (R=1, G=0, B=0) on belly equator and forward-lower ring
+- [ ] White (R=1, G=1, B=1) on torso-join and hip-join rings
+- [ ] Transition rings show pink gradient (linear interpolation between red and white), produced by Blender's vertex paint gradient/smear tool — NOT a discrete yellow band
+
+### F. Validation Passes (Gates)
+
+The asset cannot be marked complete until each of these gates passes:
+
+#### F.1 Blender export check (`tools/blender/validate_export.py`)
+
+- [ ] `--asset pudge` → PASS status (no failures, warnings reviewed)
+- [ ] All 8 expected export objects present in `PUDGE_NEW_BUILD` collection (spec §10 + script-enforced)
+- [ ] All transforms applied (scale 1, location 0, rotation 0)
+- [ ] No unapplied modifiers on export objects
+- [ ] LOD0 body within 6,000 tri ceiling, hook within 600 tri budget
+- [ ] LOD1 within 3,000 / 300 budgets, LOD2 within 1,500 / 150
+- [ ] `jiggle_boundary` vertex color layer present on all 3 body LODs (contract §6 + script-enforced)
+- [ ] Armature bone count within 21-26, MVP target 22 (contract §3 + script-enforced)
+
+#### F.1b Hook weighting check (`tools/blender/verify_hook_weights.py`)
+
+- [ ] `--asset pudge` → PASS status
+- [ ] Hook mesh weights 100% to `mixamorig:LeftHand` (or sanitized `mixamorig_LeftHand`); 0% on all other vertex groups
+
+#### F.2 Godot import sanity
+
+- [ ] `pudge.glb` imports with no ERROR rows in Godot Output panel. Warnings reviewed against the approved-warnings list at `production/qa/godot-acceptable-warnings.md` (created at Stage 10 first import; any new warning type added to the list requires technical-artist sign-off)
+- [ ] `pudge_hook.glb` imports with same warning-review standard as above
+- [ ] Skeleton bones present and named `mixamorig_*` (sanitized from `mixamorig:` per contract §3)
+- [ ] **Per contract O-5**: LOD auto-detection by `_lod*` suffix does NOT work in Godot 4.6 for pre-authored LODs. Verify each LOD `MeshInstance3D` has correct `visibility_range_begin` and `visibility_range_end` configured manually per the Stage 10 import setup. Orbit the editor camera and confirm LOD swap happens at the spec §2 distances
+
+#### F.3 In-game runtime test
+
+- [ ] Loaded by `HeroModelBuilder` without warnings (no `push_warning` or `push_error` calls during `build_model`)
+- [ ] Pudge faces movement direction at runtime (no 180° flip needed; `hero_model_builder.gd:74` `glb_root.rotation.y = PI` line removed per contract §2 + §12)
+- [ ] All 5 sockets resolve to `BoneAttachment3D` (not Marker3D fallback) — check via `print(socket.get_class())` in a smoke test, must print `BoneAttachment3D` for all 5 socket names from contract §5
+- [ ] Hook prop attached to `socket_hook_hand` at runtime (hook mesh parented to the socket node in the scene tree)
+- [ ] Team tint shader applies correctly: render the same Pudge instance 3 times with `hero_color` = `Color(0.5, 0.8, 0.2)` (green), `Color(0.9, 0.2, 0.2)` (red), `Color(0.2, 0.4, 0.9)` (blue). All three produce visually coherent Pudge with the skin tinted to the team color and non-skin surfaces (eyes, belt, boots, hook) unchanged. Screenshots saved to `production/qa/evidence/pudge-tint-{green,red,blue}.png`
+- [ ] **Silhouette readability (objective measurement)**: In the Godot editor scene view at game-cam distance (5-8 m, top-down 30° pitch), the hook prop tip extends outside the body silhouette bounding box by at least 20% of character height (≥0.28 m for the 1.40 m Pudge). Measure via the editor's selection gizmo (select hook mesh, read bounding box extents) vs body mesh bounds. Screenshot saved to `production/qa/evidence/pudge-silhouette-game-cam.png`
+- [ ] **Face readability at menu cam (objective measurement)**: At menu cam distance (1.5-2 m, eye-level), screenshot to `production/qa/evidence/pudge-face-menu-cam.png` must show: (a) asymmetric eyes — the larger left eye is visibly bigger than the right when measured in pixels (~15% larger sclera diameter per concept); (b) each pupil readable as a distinct dark spot (≥3 px wide at 1080p capture); (c) stitch lines resolve as ≥2 px wide painted dark seams across the belly front
+
+#### F.4 Performance baseline
+
+- [ ] **Stress scene** at `src/scenes/perf/pudge_stress_test.tscn` — 10 instances of `pudge.glb` at LOD0, no terrain, no VFX, all in camera frustum, shadows OFF, vsync OFF. Test apparatus + workflow documented at `tests/performance/README.md`.
+- [ ] **Target-device p95** ≤ 16 ms (60 FPS budget). Device named in contract O-1 (deferred until tech-director + producer decide). FAIL = p95 > 16 ms → spec renegotiation: drop body atlas to 512, drop LOD0 ceiling to 4,500 tris, or both. Result recorded in `tests/performance/README.md` baseline history table per the Step 6 measurement framework.
+- [ ] **Texture memory budget**: total scene texture cost ≤ 8 MB (with mips, ETC2 RGBA compression). This budgets ~5.5-7.3 MB for one Pudge's shared atlases (5 body maps at 1024² + 3 hook maps at 512²) — updated per contract O-7 verification. The previous "≤ 2 MB" criterion was authored before ETC2 RGBA's actual ~1 MB/1024² per-map cost was verified; that target is impossible without dropping atlas sizes. If 2 MB is required (e.g. low-end Android), apply contingency trims from materials spec §12 (drop tintmask to 512², drop body normal to 512²) and re-measure.
+- [ ] **Draw call count** = 20 (2 per instance × 10 = 20 mesh draw calls for characters)
+
+### G. Handoff Documentation
+
+- [ ] This spec (`design/gdd/models/pudge.md`) marked COMPLETE (not DRAFT)
+- [ ] Rig spec (`design/gdd/rigs/pudge.md`) created and matches this model spec — Stage 8 deliverable
+- [ ] Animation list (`design/gdd/animations/pudge.md`) created — Stage 9 deliverable
+- [ ] Handoff notes file (`production/handoffs/pudge-character-art-to-tech-art.md`) documenting:
+  - Known issues / deferred items
+  - Where to find each deliverable
+  - Validation log proving each gate passed
+  - Anything the next consumer needs to know that's NOT in the spec
+
+### H. Cleanup / Archive
+
+- [ ] Old `pudge.glb` (placeholder primitive version) archived as `_archive/pudge-primitives-2026-05.glb`
+- [ ] Old `mesh_pudge_body_lod0` (with stale Retopo_Shrinkwrap modifier) removed from `PUDGE_OLD_REFERENCE`
+- [ ] Existing `Untitled.blend` files in `src/assets/models/heroes/` cleaned up or moved to `_archive/`
+- [ ] `Cube` (default cube from initial scene) deleted from `PUDGE_OLD_REFERENCE` collection
+- [ ] `HeroModelBuilder.HERO_SOCKETS` constant updated with §7 positions (per contract §5)
+- [ ] `HeroModelBuilder.build_model` line `glb_root.rotation.y = PI` REMOVED (no longer needed when GLB faces -Z natively per contract §2)
+- [ ] All §12 open questions either marked RESOLVED with decision text in this spec, OR migrated to `design/gdd/contracts/pudge-interface-contract.md` §11 with owner + deadline + status (DEFERRED / PARTIAL / RESOLVED acceptable; OPEN / NEW require resolution before F-gate runs)
+
+### Acceptance Criteria
+
+Pudge is "shipped per this spec" only when:
+
+1. ✅ All A-H sections checked complete
+2. ✅ F.1, F.2, F.3 gate runs all PASS
+3. ✅ Spec status changed from "DRAFT — section-by-section authoring in progress" to "APPROVED — production ready"
+4. ✅ Sign-off recorded in handoff notes by character-artist and accepted by technical-artist
+
+If any gate fails, the asset returns to character-artist with specific failure
+notes. No partial acceptance — Pudge is either shipped per spec or not.
 
 ---
 
-*End of Pudge Stage 2 Model Spec. Awaiting user approval before sculpt begins.*
+## 12. Open Questions
+
+Questions captured during spec authoring that need resolution before or during
+specific downstream stages. Each question has an owner (the agent responsible for
+resolving it) and a deadline (which stage can't start until it's resolved).
+
+### For character-artist (Stage 4-5)
+
+#### Q12.1 — Delete OLD scaffolding NOW or at start of Stage 5?
+
+The `PUDGE_OLD_REFERENCE` collection contains the previous attempt's
+`mesh_pudge_body_lod0` (with stale `Retopo_Shrinkwrap` modifier) and the OLD
+`arm_pudge` Mixamo-rigged armature. These were preserved during Stage 2 in case
+we needed reference, but they're now confirmed obsolete.
+
+- **Option A**: Delete now — cleaner scene, smaller .blend file size
+- **Option B**: Defer to start of Stage 5 retopo — slightly less risk of accidentally needing them
+
+**Recommendation**: B. Carry them through Stage 4 sculpt cleanup as visual reference
+for "what NOT to do this time." Delete when Stage 5 retopo begins.
+
+#### Q12.2 — Apron stub: yes or no?
+
+Concept Silhouette B approved "small bloodied stub tucked under belt." Brief did
+not specify. This spec assumes YES (80 tris allocated). Reconfirm with art-director
+at Stage 4 if visual reference shows the apron breaks the silhouette read.
+
+#### Q12.3 — Boot toe splay sculpt detail
+
+Concept calls for "boots slightly too small, toes pressing against front." At
+LOD0 budget this is sculpt detail (~20-30 tris). Confirm sculptor delivers this
+or it's purely a painted detail.
+
+### For texture-artist (Stage 7)
+
+#### Q12.4 — Tint shader: rewrite to mask-based or extend existing hue-based?
+
+The existing `res://assets/shaders/hero_body_tint.gdshader` detects skin via
+hue band (yellow-green hue range). This spec §5 prescribes a mask-based approach
+(alpha channel of base color = tint mask). Two paths:
+
+- **Option A**: Rewrite shader to mask-based. Cleaner, more controllable. Requires
+  every existing hero's base color to be re-authored with alpha mask.
+- **Option B**: Keep hue-based for current heroes, paint Pudge's base color to fit
+  the existing detection. Limits skin base palette.
+
+**Decision needed before Stage 7 texture painting starts.** Owner: art-director +
+gameplay-programmer.
+
+#### Q12.5 — Eye emissive: separate 256² texture or pack into ORM alpha?
+
+§5 specifies a separate 256x256 emissive texture. Alternative is packing emissive
+intensity into the alpha channel of the ORM texture (no separate file). The
+separate texture is simpler to author; the packed approach saves 16 KB at runtime.
+
+**Recommendation**: separate texture. The 16 KB savings is negligible vs the
+authoring complexity of pack-and-unpack.
+
+#### Q12.6 — Apron blood density at 256 px/m
+
+The apron stub UV island will be small (probably 32-48 px square in the atlas).
+Confirm blood spatter is legible at this size before painting. If not, increase
+density on the apron specifically OR accept blood is a painted hint, not detailed.
+
+#### Q12.7 — Stitch geometry vs painted stitches
+
+§3 currently treats stitches as painted detail at 256 px/m on torso front. If
+the texture-artist finds 256 px/m insufficient at game cam distance, flag before
+final unwrap — we may need to either bump face density or add stitch decal geometry
+(adds tris to the LOD0 budget).
+
+### For rigging-animator (Stage 8)
+
+#### Q12.8 — BellyJiggle bone: spring or keyframe?
+
+§9 says "spring-driven via `SkeletonModification3D` if available, else keyframed."
+Godot 4.6 restored skeleton modifications — confirm the spring modifier works for
+secondary motion on a single bone driven by the parent's velocity. If it works,
+spring is preferred (zero animator keyframe work). If not, all 10 animation clips
+need belly bounce keyframed manually.
+
+**Test in Stage 8 before authoring animation clips.**
+
+#### Q12.9 — Chain bone count: include in MVP or post-MVP?
+
+§9 lists `ChainLink1-4` as optional. If included, idle/walk gain organic chain sway
+but skeleton grows to 25 bones. If excluded, chain is a static painted strip on the
+body atlas (no sway).
+
+- **MVP recommendation**: exclude (keep at 22 bones)
+- **Polish phase**: add the chain bones + spring sim
+
+**Decision before Stage 8 starts** so the rigger knows the skeleton scope.
+
+#### Q12.10 — Jaw bone: required for MVP or cut with taunt?
+
+§9 lists Jaw as optional. Jaw is needed for `taunt` clip (mouth open) and `death`
+clip (gape). If taunt is descoped from MVP, Jaw can be cut, saving 1 bone.
+
+**Open question**: is `taunt` in MVP or post-MVP? Owner: game-designer.
+
+#### Q12.11 — Hook prop weight constraint verification
+
+Hook must be 100% weighted to `mixamorig:LeftHand`. The rigger must verify this
+manually — if Mixamo auto-skin assigns any other bone influence to the hook geometry,
+the hook will deform incorrectly when detached as projectile.
+
+**Stage 8 pre-export check** — automated check would be great here, but a manual
+"select hook verts, inspect vertex group weights" verification is sufficient.
+
+#### Q12.12 — Left shoulder 4-loop deformation test (corrective blendshape)
+
+The 4-loop left shoulder must hold cleanly at the Silhouette B 45° raise. The rigger
+tests this in Stage 8 by posing LeftArm to the idle position and inspecting for
+pinching.
+
+- If clean: no action needed
+- If pinching: rigger flags to character-artist to author `correct_leftarm_raised`
+  blendshape (§9)
+
+### For blender-specialist (Stage 10)
+
+#### Q12.13 — Export orientation: built right the first time?
+
+§6 mandates Pudge faces -Y in Blender so exports face -Z in Godot. The current
+`pudge_v2_remesh` (Stage 2 scaffolding) was imported from Hunyuan3D — direction
+not verified.
+
+**Stage 4 (sculpt cleanup) must verify the mesh faces -Y in Blender front view**
+before sculpting begins. If it faces +Y, rotate 180° around Z axis and apply
+rotation. Catching this early avoids the cascading 180°-flip-on-loader bug.
+
+#### Q12.14 — LOD object naming for Godot's auto-detect
+
+§10 specifies `mesh_pudge_body_lod0` / `_lod1` / `_lod2` for Godot's automatic LOD
+detection. Verify this auto-detect actually works in Godot 4.6 (versus needing
+manual import settings). If auto-detect fails:
+
+- **Workaround A**: Use Godot import dock to manually configure LODs
+- **Workaround B**: Switch to `MeshInstance3D.set_visibility_range` programmatically
+  at runtime in `HeroModelBuilder`
+
+Test during first export to Godot.
+
+#### Q12.15 — Working .blend file location
+
+Current authoring file: `src/assets/models/heroes/anime_pudge.blend`. Spec §10
+mentions an optional canonical handoff copy at `tools/blender/pudge.blend`. Do we
+need that second copy, or is the source .blend sufficient as both authoring AND
+handoff artifact?
+
+**Recommendation**: keep one .blend (in `src/`). Simpler.
+
+### For gameplay-programmer (Stage 10)
+
+#### Q12.16 — Update HERO_SOCKETS constant
+
+`hero_model_builder.gd:25-46` has socket positions hardcoded for the OLD 1.88 m
+Pudge. New values from §7 must replace them when the new GLB is ready. This is a
+single-edit code change but easy to forget.
+
+#### Q12.17 — Delete glb_root.rotation.y = PI hack
+
+`hero_model_builder.gd:74` rotates the loaded GLB 180° to compensate for the
+existing pudge.glb's wrong-direction export. When the new pudge.glb ships
+correctly facing -Z, this line MUST be deleted — otherwise the new Pudge faces
+backwards.
+
+This is the highest-risk code change. Easy to forget. Flag it in handoff notes.
+
+### For game-designer / producer (strategic)
+
+#### Q12.18 — Update `design/gdd/hero-system.md` to include Pudge as 4th hero
+
+User confirmed Pudge is a "separate 4th hero" (not Vex's visual identity).
+`hero-system.md` currently lists 3 heroes: Vex, Lash, Maw. Pudge needs to be added
+to the roster with his own data file (`data/heroes/pudge.tres` already exists from
+prior work) and statline.
+
+**Owner**: game-designer. **Deadline**: Stage 10 — when Pudge ships, the hero
+system must know about him.
+
+#### Q12.19 — Concept doc title update
+
+`design/concept-art/pudge.md` was authored for "Vex's visual identity" (or some
+historical context where the hero_id and visual identity were intertwined).
+Now that Pudge is a separate hero, the concept doc should be reviewed for stale
+references. Owner: narrative-director / concept-artist.
+
+#### Q12.20 — Performance target device
+
+§11 specifies "Mid-tier mobile target device." What is the actual target?
+
+- Samsung Galaxy A54 (mid-range 2023)?
+- iPhone 12 (mid-range 2020-2023)?
+- Both?
+
+The 6,000-tri LOD0 + 1024 atlas assumes mid-range mobile. If the actual target is
+high-end mobile only (iPhone 14 Pro+, S23+), budgets can grow. If low-end is
+included (sub-$300 Android), budgets must shrink.
+
+**Owner**: technical-director + producer. **Deadline**: before Stage 7 texture
+authoring (different compression for different tiers).
+
+### For QA (Stage 8+)
+
+#### Q12.21 — Acceptance test poses
+
+Stage 8 rigger should test these specific poses before signing off:
+
+- **QA1**: LeftArm raised 45° (Silhouette B idle) — check for shoulder pinch
+- **QA2**: RightArm raised 90° (attack swing) — check for shoulder pinch
+- **QA3**: Hips rotated 60° (death sway) — check belly + hip deformation
+- **QA4**: Head rotated 30° (looking around) — check no-neck hunch holds
+- **QA5**: Jaw open 25° (taunt/death) — check mouth loop deformation
+
+Each pose passes when geometry holds without pinching, no Z-fighting, no inverted
+faces.
+
+### For art-director (project-wide)
+
+#### Q12.22 — Tint range validation for chibi style
+
+The mask-based tint shader (§5) needs to support the full team color range. With
+8 possible team colors (assume Brawl Stars 5v5 has 2-3 team colors max per match,
+total roster ~6-8), all must produce coherent Pudge.
+
+**Provide the full team color list** to texture-artist before painting begins.
+Currently only "green/red/blue" mentioned as examples — what's the actual roster?
+
+#### Q12.23 — Pudge variation skins (post-MVP scope)
+
+Will Pudge have skins (alternate colors / outfits) post-MVP? If yes, this affects
+UV layout (need skin-swap-friendly islands), material design (alternate textures),
+and storage. If no, current single-skin design is sufficient.
+
+### Decision Status Table
+
+Open questions roll up here for at-a-glance status:
+
+| ID | Question | Owner | Deadline | Status |
+|---|---|---|---|---|
+| Q12.1 | Delete OLD scaffolding now | character-artist | Start of Stage 5 | Recommendation: defer to Stage 5 |
+| Q12.2 | Apron stub yes/no | art-director | Stage 4 | Recommendation: yes |
+| Q12.4 | Tint shader rewrite | art-director + gameplay-prog | Stage 7 | Recommendation: rewrite to mask-based |
+| Q12.5 | Eye emissive separate vs packed | texture-artist | Stage 7 | Recommendation: separate |
+| Q12.8 | BellyJiggle spring vs keyframe | rigging-animator | Stage 8 | Test spring first |
+| Q12.9 | Chain bones in MVP | rigging-animator | Stage 8 | Recommendation: exclude (post-MVP) |
+| Q12.10 | Jaw bone in MVP | game-designer | Stage 8 | Tied to taunt scope decision |
+| Q12.13 | Mesh orientation verified | blender-specialist | Stage 4 | Action: verify before sculpt |
+| Q12.14 | LOD auto-detect works | blender-specialist | Stage 10 | Action: test during first export |
+| Q12.18 | Update hero-system.md | game-designer | Stage 10 | Action item carried forward |
+| Q12.20 | Mid-tier device target | technical-director | Stage 7 | Decision needed |
+
+---
+
+*End of Pudge Model Spec — Stage 3.*
+*Sections 1-12 authored 2026-05-30. Status: DRAFT awaiting full review.*
+*Next: review all sections together, then mark APPROVED and begin Stage 4 (sculpt cleanup).*
