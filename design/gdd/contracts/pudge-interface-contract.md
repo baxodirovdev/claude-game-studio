@@ -831,6 +831,7 @@ must close their items by the listed deadline or escalate.
 | O-10 | Pudge variation skins (post-MVP scope) | (Q12.23) | art-director | N/A — explicitly post-MVP | OUT OF SCOPE |
 | O-11 | Team color full roster for tint validation | (Q12.22) | art-director | Before Stage 7 | OPEN |
 | O-12 | Perf baseline measurement on 10-Pudge stress scene | (Step 6) | performance-analyst | After Stage 10 first export | OPEN — blocked by O-1 |
+| O-13 | LOD3 impostor billboard | model spec §2 LOD table | technical-artist | N/A — DEFERRED to post-MVP | RESOLVED — drop from MVP, use LOD2 to infinity (Godot 4.6 has no built-in impostor system; building one is not worth MVP scope) |
 
 ### Decision authority
 
@@ -856,6 +857,7 @@ the change required.
 - [ ] `design/gdd/models/pudge.md` §9 — confirm bone count = 22 MVP (Jaw included, ChainLink excluded), remove the "25 full" line as misleading (chain is post-MVP, full count = 26 with chain)
 - [ ] `design/gdd/models/pudge.md` §10 — update texture paths to `src/assets/textures/heroes/pudge/` with no `pudge_` prefix on filenames
 - [ ] `design/gdd/models/pudge.md` §11 F.4 — rewrite "under 16 ms on mid-tier device" with concrete device once O-1 resolves
+- [ ] `design/gdd/models/pudge.md` §2 LOD table — mark LOD3 impostor row as POST-MVP per O-13; document that LOD2 extends to infinity for MVP
 - [ ] `design/gdd/rigs/pudge.md` §1 — rewrite bone hierarchy with `mixamorig:` prefix, rename `Chest` → `Spine2`, drop ChainLink1-4 (post-MVP)
 - [ ] `design/gdd/rigs/pudge.md` §2 — rewrite bind pose joint angle table for T-pose (LeftArm Z=0, RightArm Z=0, spine Z=0 with no hunch in bind)
 - [ ] `design/gdd/rigs/pudge.md` §4.3 — mark ChainLink bones as POST-MVP, deferred

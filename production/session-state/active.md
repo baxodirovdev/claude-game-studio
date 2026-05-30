@@ -135,9 +135,13 @@ The user explicitly chose "Stop here, revise in a separate session." Do NOT atte
    - §11 Open items roll-up (12 items)
    - §12 Propagation checklist (15 design doc edits + 3 code edits + 3 tools + 3 cross-hero textures)
 
-### What's pending (Steps 4-9 of resume plan)
+### What's pending (Steps 5-9 of resume plan)
 
-- **Step 4** — Build phantom tools: finish `validate_export.py`, write `verify_hook_weights.py`, write collection-filter export script, decide impostor pipeline (recommend defer)
+- ✅ **Step 4 — DONE 2026-05-31** — Phantom tools built:
+  - `tools/blender/validate_export.py` extended with LOD budget + jiggle_boundary + bone count + collection checks (tested headlessly, correctly catches all current .blend issues)
+  - `tools/blender/verify_hook_weights.py` NEW — verifies hook mesh weighted exclusively to mixamorig:LeftHand
+  - `tools/blender/export_pudge.py` NEW — two-pass export (body GLB + hook GLB) with collection filter via hide/select/restore, `--dry-run` and `--out-dir` flags
+  - LOD3 impostor DEFERRED to post-MVP (contract O-13 added; model spec §2 LOD table updated; LOD2 extends to infinity)
 - **Step 5** — Verify Godot 4.6 APIs via godot-specialist (O-4, O-5, O-6, O-7 from contract §11)
 - **Step 6** — Measure perf baseline (10 Pudge stress scene) — blocked by O-1 (device tier)
 - **Step 7** — Re-author 6 untestable acceptance criteria in model spec
