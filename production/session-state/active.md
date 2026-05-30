@@ -147,7 +147,12 @@ The user explicitly chose "Stop here, revise in a separate session." Do NOT atte
   - **O-5 RESOLVED**: `_lod*` suffix auto-detect is a *proposal*, not implemented. Pre-authored LODs require manual `visibility_range_begin/end` setup per MeshInstance3D + disabling automatic LOD generation. Model spec §10 needs revision.
   - **O-6 RESOLVED**: Per-instance sampler uniforms NOT supported (`instance uniform sampler2D` → compile error). Per-instance scalar/vec (like `team_tint_color`) IS supported. Contract §7 is correct as-written; added explicit "samplers stay per-material" note.
   - **O-7 RESOLVED**: ASTC 6×6 is ~2.25× smaller than ETC2 RGBA at 1024² (~0.46 MB vs ~1 MB compressed). Godot's "Mobile / High Quality" preset uses ASTC 4×4 (same size as ETC2 but better quality), not 6×6. ASTC 6×6 requires manual import setting. Final choice gated on O-1 (device tier). Materials spec §12 VRAM table is optimistic — actually ~2× larger than stated.
-- **Step 6** — Measure perf baseline (10 Pudge stress scene) — blocked by O-1 (device tier)
+- ✅ **Step 6 — DONE 2026-05-31 (PARTIAL — dev-machine only)** — Stress test scene built and validated:
+  - `src/scenes/perf/pudge_stress_test.tscn` + `src/scenes/perf/pudge_stress_test.gd` — 10-instance Pudge stress harness, configurable instance count / sample duration / vsync-disabled, auto-quits with frame time percentile report
+  - `tests/performance/README.md` — usage docs + baseline history table
+  - First baseline run: RTX 5050 / Vulkan Forward Mobile / prototype primitives Pudge: **p95 = 0.34 ms** (dev machine, NOT mid-tier mobile target)
+  - Caveats documented: result is informational only — final perf verdict requires (1) O-1 device tier resolution, (2) Stage 10 final Pudge GLB, (3) measurement on actual target device
+  - Contract O-12 updated: OPEN → PARTIAL (dev baseline captured, mobile measurement still blocked)
 - **Step 7** — Re-author 6 untestable acceptance criteria in model spec
 - **Step 8** — Re-run /design-review on revised model spec → target APPROVED
 - **Step 9** — Add Pudge to `design/gdd/hero-system.md` (Q12.18)

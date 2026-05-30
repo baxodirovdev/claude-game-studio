@@ -856,7 +856,7 @@ must close their items by the listed deadline or escalate.
 | O-9 | Update `design/gdd/hero-system.md` with Pudge | (Q12.18) | game-designer | Stage 10 | OPEN |
 | O-10 | Pudge variation skins (post-MVP scope) | (Q12.23) | art-director | N/A — explicitly post-MVP | OUT OF SCOPE |
 | O-11 | Team color full roster for tint validation | (Q12.22) | art-director | Before Stage 7 | OPEN |
-| O-12 | Perf baseline measurement on 10-Pudge stress scene | (Step 6) | performance-analyst | After Stage 10 first export | OPEN — blocked by O-1 |
+| O-12 | Perf baseline measurement on 10-Pudge stress scene | (Step 6) | performance-analyst | After Stage 10 first export | **PARTIAL (Step 6, 2026-05-31)** — dev-machine baseline captured (RTX 5050 / Vulkan, 10 PROTOTYPE Pudges: p95 = 0.34 ms). Measurement scene + workflow live at `src/scenes/perf/pudge_stress_test.tscn` + `tests/performance/README.md`. Mobile target-device measurement still gated on O-1 (device tier) AND Stage 10 (real spec-compliant Pudge GLB). Current baseline is for the prototype primitives-built Pudge — final single-skinned-mesh Pudge will perform differently. |
 | O-13 | LOD3 impostor billboard | model spec §2 LOD table | technical-artist | N/A — DEFERRED to post-MVP | RESOLVED — drop from MVP, use LOD2 to infinity (Godot 4.6 has no built-in impostor system; building one is not worth MVP scope) |
 
 ### Decision authority
@@ -918,7 +918,8 @@ the change required.
 - [ ] All three specs (model, rig, materials) re-read end-to-end for residual inconsistencies
 - [ ] `/design-review design/gdd/models/pudge.md` re-run → target APPROVED verdict
 - [ ] Manual smoke check: load updated `HeroModelBuilder` in Godot editor, instantiate placeholder Pudge, confirm no runtime errors
-- [ ] This contract's §11 open items list has zero entries in NEW or OPEN status (DEFERRED entries with owner+deadline are acceptable)
+- [ ] Run `src/scenes/perf/pudge_stress_test.tscn` on the target mobile device (post-Stage 10) and record p95 in `tests/performance/README.md` history table
+- [ ] This contract's §11 open items list has zero entries in NEW or OPEN status (DEFERRED, PARTIAL with owner+deadline, and RESOLVED entries are acceptable)
 
 ---
 
