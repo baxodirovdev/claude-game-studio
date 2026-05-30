@@ -142,7 +142,11 @@ The user explicitly chose "Stop here, revise in a separate session." Do NOT atte
   - `tools/blender/verify_hook_weights.py` NEW — verifies hook mesh weighted exclusively to mixamorig:LeftHand
   - `tools/blender/export_pudge.py` NEW — two-pass export (body GLB + hook GLB) with collection filter via hide/select/restore, `--dry-run` and `--out-dir` flags
   - LOD3 impostor DEFERRED to post-MVP (contract O-13 added; model spec §2 LOD table updated; LOD2 extends to infinity)
-- **Step 5** — Verify Godot 4.6 APIs via godot-specialist (O-4, O-5, O-6, O-7 from contract §11)
+- ✅ **Step 5 — DONE 2026-05-31** — Godot 4.6 API verifications via project engine reference + WebFetch/WebSearch:
+  - **O-4 RESOLVED**: No `SkeletonModification3DJiggle` exists in Godot 4.6 (only CCDIK/FABRIK/Jacobian/Spline/TwoBoneIK + BoneConstraint3D set). BellyJiggle locked to **keyframe in all clips** for MVP. Custom GDScript modifier moves to post-MVP.
+  - **O-5 RESOLVED**: `_lod*` suffix auto-detect is a *proposal*, not implemented. Pre-authored LODs require manual `visibility_range_begin/end` setup per MeshInstance3D + disabling automatic LOD generation. Model spec §10 needs revision.
+  - **O-6 RESOLVED**: Per-instance sampler uniforms NOT supported (`instance uniform sampler2D` → compile error). Per-instance scalar/vec (like `team_tint_color`) IS supported. Contract §7 is correct as-written; added explicit "samplers stay per-material" note.
+  - **O-7 RESOLVED**: ASTC 6×6 is ~2.25× smaller than ETC2 RGBA at 1024² (~0.46 MB vs ~1 MB compressed). Godot's "Mobile / High Quality" preset uses ASTC 4×4 (same size as ETC2 but better quality), not 6×6. ASTC 6×6 requires manual import setting. Final choice gated on O-1 (device tier). Materials spec §12 VRAM table is optimistic — actually ~2× larger than stated.
 - **Step 6** — Measure perf baseline (10 Pudge stress scene) — blocked by O-1 (device tier)
 - **Step 7** — Re-author 6 untestable acceptance criteria in model spec
 - **Step 8** — Re-run /design-review on revised model spec → target APPROVED

@@ -287,22 +287,28 @@ world -Z — i.e., toward Pudge's face. The 20 cm offset therefore places the
 BellyJiggle bone 20 cm in front of the spine, at the belly equator's
 maximum protrusion point.
 
-#### Drive strategy — runtime spring (preferred) or baked keyframe (fallback)
+#### Drive strategy — keyframe in all clips (LOCKED — Godot 4.6 has no spring API)
 
-The rig spec recommends driving BellyJiggle via a runtime spring simulation
-in Godot 4.6 (`SkeletonModifier3D` custom GDScript). This contract preserves
-that preference but **explicitly conditions it on Godot 4.6 API
-verification** (Step 5 of the revision plan):
+Per Step 5 verification (O-4, 2026-05-31): **Godot 4.6 ships no built-in
+spring/jiggle SkeletonModifier3D.** The available modifiers are CCDIK,
+FABRIK, Jacobian IK, Spline IK, TwoBoneIK (4.6 IK restoration) plus 4.5's
+BoneConstraint3D set (AimModifier3D, CopyTransformModifier3D,
+ConvertTransformModifier3D) — none are physics-driven.
 
-- **If a working spring modifier ships in Godot 4.6**: use it. Zero animator
-  keyframe work for `idle`/`walk`/`run`. The `death` clip is the only
-  exception — it keyframes BellyJiggle explicitly for the gut-deflate beat,
-  and the spring is disabled (weight = 0) during `death` playback.
-- **If no working spring modifier exists**: all 10 animation clips author
-  BellyJiggle keyframes manually. The animator's workload grows by an
-  estimated 20%.
+**MVP path**: BellyJiggle is keyframed in all 10 animation clips by the
+animator. Estimated ~20% additional animation authoring time vs the runtime-
+spring path. This is the locked path because:
 
-Decision deadline: Stage 5 verification result (Step 5 task #5). Tracked at §11.
+- Eliminates engine-API risk before Stage 8 starts
+- Animator can hand-tune the bounce per-clip (run wants more amplitude than walk)
+- Death clip's deflate beat (rig spec §8 clip 9 phase 5) was always going to
+  be keyframed anyway — consistency
+- Custom GDScript SkeletonModifier3D for spring (~50 lines) is post-MVP
+  polish if profiling shows keyframe drift across clip blends
+
+**Rig spec §4.1 must be revised** to drop the "spring if available, else
+keyframe" conditional and lock to keyframe-only. Spring modifier mention
+moves to a "post-MVP" footnote.
 
 #### Boundary annotation source
 
@@ -582,7 +588,7 @@ Where:
 | `orm_texture` | sampler2D | — | `body_orm.png` |
 | `emission_texture` | sampler2D | — | `body_emissive.png` |
 | `tint_mask_texture` | sampler2D | — | `body_tintmask.png` |
-| `team_tint_color` | vec3 (Color) | `Color(0.5, 0.8, 0.2)` (Pudge green) | Per-instance set by `HeroConfig.hero_color` |
+| `team_tint_color` | vec3 (Color) | `Color(0.5, 0.8, 0.2)` (Pudge green) | Per-instance set by `HeroConfig.hero_color` via `set_instance_shader_parameter("team_tint_color", color)` |
 | `emission_color` | vec3 (Color) | `Color(1.0, 0.7, 0.0)` (eye yellow) | Material constant |
 | `emission_energy` | float | 3.0 | Material constant |
 
@@ -602,6 +608,26 @@ Where:
 
 Soft feather (1-3 px) permitted at skin/cloth boundaries to avoid hard
 edges; hard-edged at all non-skin material boundaries.
+
+### Per-instance vs per-material parameter rules (Godot 4.6 constraint)
+
+Per Step 5 verification (O-6, 2026-05-31): Godot 4.6 **does not support
+`instance uniform sampler2D`** — the shader compiler rejects sampler types
+with the per-instance qualifier. For Pudge's shader this is fine because:
+
+- **Per-instance**: `team_tint_color` (vec3) — declared as
+  `instance uniform vec3 team_tint_color`. Each MeshInstance3D sets its own
+  value via `set_instance_shader_parameter()`.
+- **Per-material (shared across instances)**: all `sampler2D` uniforms
+  (`albedo_texture`, `normal_texture`, `orm_texture`, `emission_texture`,
+  `tint_mask_texture`). Declared as regular `uniform sampler2D`. Set once on
+  the shared `ShaderMaterial`; all 10 Pudge instances read the same texture
+  bindings.
+
+The Texture2D resources are reference-counted by Godot — referencing the
+same texture from 10 MeshInstance3D nodes loads it into VRAM once.
+**Do not attempt to make sampler uniforms per-instance later.** It will fail
+to compile.
 
 ### Shader rewrite required (Stage 7 blocker)
 
@@ -822,10 +848,10 @@ must close their items by the listed deadline or escalate.
 | O-1 | Target device tier (Q1) | §8 | technical-director + producer | Before Stage 7 | DEFERRED |
 | O-2 | Mesh axis verification (Q2) | §9 | blender-specialist | Stage 4 entry | DEFERRED |
 | O-3 | Movement speed reconciliation | §10 | gameplay-programmer | Stage 9 entry | NEW — needs resolution |
-| O-4 | BellyJiggle spring API exists in Godot 4.6? | §4.1 | godot-specialist (Step 5 task) | Stage 8 entry | OPEN — verify |
-| O-5 | LOD auto-detect by `_lod*` suffix works for pre-authored LODs? | §3 of model spec | godot-specialist (Step 5 task) | Stage 10 entry | OPEN — verify |
-| O-6 | Texture sharing via `set_instance_shader_parameter` preserves shared materials? | §7 (per-instance tint) | godot-specialist (Step 5 task) | Stage 10 entry | OPEN — verify |
-| O-7 | ETC2 size cost vs ASTC 6×6 for 1024 atlas | §7 / §8 | godot-specialist (Step 5 task) | Stage 7 entry | OPEN — measure |
+| O-4 | BellyJiggle spring API exists in Godot 4.6? | §4.1 | Step 5 (verified 2026-05-31) | Stage 8 entry | **RESOLVED — NO.** Godot 4.6 has CCDIK, FABRIK, Jacobian IK, Spline IK, TwoBoneIK + 4.5's BoneConstraint3D (AimModifier3D, CopyTransformModifier3D, ConvertTransformModifier3D). **No spring/jiggle modifier exists.** Two paths: (A) write a custom `SkeletonModifier3D` GDScript subclass (~50 lines, evaluates spring physics each frame), or (B) keyframe BellyJiggle in all 10 animation clips. Recommend **(B) for MVP** — eliminates engine-API risk, costs ~20% more animator time. Revisit (A) post-MVP if profiling shows keyframe drift. |
+| O-5 | LOD auto-detect by `_lod*` suffix works for pre-authored LODs? | §3 of model spec | Step 5 (verified 2026-05-31) | Stage 10 entry | **RESOLVED — NO.** Godot's `_lod*` suffix detection is a *proposal*, not implemented in 4.6. Godot 4.6 auto-generates LODs from a single source mesh via meshoptimizer, but does **not** group pre-authored separate meshes by suffix. **Correct workflow**: import each LOD as its own `MeshInstance3D`, configure `visibility_range_begin/end` per instance, disable LOD auto-generation in import settings. Model spec §10 must drop the "auto-detect by suffix" claim and document the per-MeshInstance3D `visibility_range_*` setup at Stage 10. |
+| O-6 | Texture sharing via `set_instance_shader_parameter` preserves shared materials? | §7 (per-instance tint) | Step 5 (verified 2026-05-31) | Stage 10 entry | **RESOLVED — sampler per-instance NOT supported; scalar/vec per-instance works.** `instance uniform sampler2D` throws "SCOPE_INSTANCE not supported for sampler types". **For Pudge that's fine** — only `team_tint_color` (vec3) needs to vary per instance; samplers stay on the shared ShaderMaterial. 10 instances reference the same Texture2D resource → loaded once in VRAM. Contract §7's tint formula is correct as-written; no change needed. Document the constraint: samplers are per-material, NOT per-instance — don't try to make them per-instance later. |
+| O-7 | ETC2 size cost vs ASTC 6×6 for 1024 atlas | §7 / §8 | Step 5 (verified 2026-05-31) | Stage 7 entry | **RESOLVED — ASTC 6×6 is ~2.25× smaller than ETC2 RGBA for the same 1024² atlas.** Per-pixel: ETC2 RGBA = 8 BPP (1 byte/px → 1 MB at 1024²); ASTC 6×6 = 3.56 BPP (~0.45 byte/px → ~0.46 MB at 1024²); ASTC 4×4 = 8 BPP (same as ETC2 but higher quality); BC7 desktop = 8 BPP. Godot 4.6 "Mobile / Low Quality" preset picks ETC2; "Mobile / High Quality" picks ASTC 4×4 (not 6×6). **ASTC 6×6 must be set manually per texture import.** Decision pending O-1 (device tier): if iOS-only or A8+ Android only, use ASTC 6×6 (~55% size reduction); if broader Android baseline, use ETC2 RGBA. **Materials spec §12 VRAM table may be optimistic** — re-check ETC2 RGBA estimates (spec says 0.5 MB/1024², actually ~1 MB/1024²). |
 | O-8 | Cross-hero tintmask painting (Vex/Lash/Maw) | §7 | art-director (scope) + texture-artist (work) | Before Pudge ships (or scope to Pudge only) | NEW |
 | O-9 | Update `design/gdd/hero-system.md` with Pudge | (Q12.18) | game-designer | Stage 10 | OPEN |
 | O-10 | Pudge variation skins (post-MVP scope) | (Q12.23) | art-director | N/A — explicitly post-MVP | OUT OF SCOPE |
@@ -858,6 +884,8 @@ the change required.
 - [ ] `design/gdd/models/pudge.md` §10 — update texture paths to `src/assets/textures/heroes/pudge/` with no `pudge_` prefix on filenames
 - [ ] `design/gdd/models/pudge.md` §11 F.4 — rewrite "under 16 ms on mid-tier device" with concrete device once O-1 resolves
 - [ ] `design/gdd/models/pudge.md` §2 LOD table — mark LOD3 impostor row as POST-MVP per O-13; document that LOD2 extends to infinity for MVP
+- [ ] `design/gdd/models/pudge.md` §10 — drop the "Godot's glTF importer auto-detects `_lod0`/`_lod1`/`_lod2` suffixes" claim per O-5. Add Stage 10 task: configure `visibility_range_begin` + `visibility_range_end` per LOD `MeshInstance3D` in the imported scene; disable Godot's automatic LOD generation in import settings (set "Generate LODs" to false).
+- [ ] `design/gdd/rigs/pudge.md` §4.1 — drop the "spring if Godot 4.6 supports it, else keyframe" conditional per O-4; lock to keyframe-only for MVP. Move spring-modifier discussion to a "post-MVP polish" footnote.
 - [ ] `design/gdd/rigs/pudge.md` §1 — rewrite bone hierarchy with `mixamorig:` prefix, rename `Chest` → `Spine2`, drop ChainLink1-4 (post-MVP)
 - [ ] `design/gdd/rigs/pudge.md` §2 — rewrite bind pose joint angle table for T-pose (LeftArm Z=0, RightArm Z=0, spine Z=0 with no hunch in bind)
 - [ ] `design/gdd/rigs/pudge.md` §4.3 — mark ChainLink bones as POST-MVP, deferred
