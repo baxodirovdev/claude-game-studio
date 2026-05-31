@@ -31,7 +31,7 @@ Pillar 2 (Play Your Way): hero choice is the primary expression of playstyle.
 
 ### Core Rules
 
-**Hero Roster (MVP: 3 Heroes)**
+**Hero Roster (MVP: 4 Heroes)**
 
 1. **Vex — The Chain Puller** (Baseline/beginner)
    - Hook type: Classic straight-line chain pull
@@ -56,6 +56,28 @@ Pillar 2 (Play Your Way): hero choice is the primary expression of playstyle.
    - Special: The blade hits on return travel too. If it misses going out, it might
      hit coming back. No pull — pure damage on both passes.
 
+4. **Pudge — The Butcher** (Tank/disruptor)
+   - Hook type: PULL (same family as Vex's chain pull, different stat profile)
+   - Fantasy: Grotesque jovial butcher. Slow, tanky, low skillshot speed but
+     enormous reward on connect. Where Vex is the "balanced beginner pull",
+     Pudge is the "high-HP punisher pull" — you survive bad positioning long
+     enough to land one game-changing hook.
+   - Stats (target profile, NEEDS GAME-DESIGNER BALANCE PASS):
+     Slow speed, very high health (~150 HP target), high damage on connect,
+     long cooldown (~3 s), slightly larger hitbox. Distinct from Vex by
+     trading mobility/agility for survivability.
+   - Skill floor: Low. Skill ceiling: Medium.
+   - Special: Hook prop is a separate detachable mesh per Stage 10 spec
+     (`design/gdd/models/pudge.md`) — visually distinct from Vex's
+     procedural chain. Asset pipeline tracked at `design/gdd/contracts/pudge-interface-contract.md`.
+
+> **⚠ STAT BALANCE GAP** (contract O-9 — `design/gdd/contracts/pudge-interface-contract.md` §11):
+> `src/data/heroes/pudge.tres` currently contains debug placeholder values
+> (`hook_damage = 99999`, `xp_on_hook_hit = 0`, leveling bonuses zeroed).
+> Real Pudge stats need to come from the same hits-to-kill matrix analysis
+> applied to Vex/Lash/Maw below (target: 3-5 hooks to kill Pudge with most
+> heroes, given tank role). Game-designer task before Stage 10 ships.
+
 **Hero Data Structure**
 
 Each hero is defined by a data file containing:
@@ -69,7 +91,7 @@ hook_speed: float
 hook_range: float
 hook_damage: float
 hook_cooldown: float
-hook_type: enum (PULL, GRAPPLE, BOOMERANG)
+hook_type: enum (PULL, GRAPPLE, BOOMERANG, CHARGE, BEAM)
 hook_hitbox_size: float
 pull_duration: float       # only for PULL type
 grapple_duration: float    # only for GRAPPLE type
@@ -285,3 +307,5 @@ fragile but mobile. Maw hits hard but is slow and short-ranged — rewards preci
 | Should level-up choices exist (pick between 2 upgrades) or be fixed? | game-designer | Before Vertical Slice | Fixed for MVP (simpler). Choices add depth but slow down mobile gameplay. Revisit for item shop integration in VS. |
 | What are the hero unlock mechanics for the full roster? | game-designer + economy-designer | Before Alpha | MVP: all 3 heroes free. Full vision: unlock via gameplay currency (no pay-to-win per Pillar 3). |
 | Should heroes have a secondary ability? Concept doc mentions it. | game-designer | Before Vertical Slice | Not in MVP. Focus on hook identity first. Add secondaries in VS if hook-only feels limiting. |
+| Pudge stat balance pass — `pudge.tres` currently has debug values | game-designer | Before Stage 10 ships | Apply same hits-to-kill matrix logic used for Vex/Lash/Maw above. Aim for tank role: 3-5 hooks to kill Pudge with most heroes; Pudge needs 4-5 hooks to kill Vex (higher than Vex baseline because slower windup). |
+| Coil and Flux hero data files exist (`src/data/heroes/coil.tres`, `flux.tres` with `hook_type = CHARGE` and `BEAM` respectively) but neither is documented in this GDD roster | game-designer | Before Polish phase | Either author full hero entries for both — including stats, fantasy, hook behavior table rows, hits-to-kill matrix entries — OR remove the data files if they're prototype-only experiments. The HookType enum in `src/data/config/hero_config.gd` lists PULL/GRAPPLE/BOOMERANG/CHARGE/BEAM, so the type slots are reserved either way. |

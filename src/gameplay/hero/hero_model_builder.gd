@@ -48,14 +48,18 @@ const HERO_SOCKETS := {
 ## Build a hero model and attach it to the given parent node.
 ## Replaces the default MeshInstance3D with a multi-mesh character.
 static func build_model(parent: Node3D, hero_config: HeroConfig) -> void:
-	# Remove existing simple mesh
-	var old_mesh := parent.get_node_or_null("MeshInstance3D")
-	if old_mesh:
-		old_mesh.queue_free()
+	# Remove any existing hero model(s). Match by meta as well as name, and
+	# detach immediately (remove_child) rather than only queue_free: queue_free
+	# is deferred, so on a rebuild the same frame the "MeshInstance3D" name would
+	# collide, the new node would get a mangled name, and the prior instance
+	# would linger as a second (static) copy overlapping the new one.
+	for child in parent.get_children():
+		if child.name == "MeshInstance3D" or child.has_meta("hero_model"):
+			parent.remove_child(child)
+			child.queue_free()
 
 	# If a pre-made GLB exists for this hero, use it and skip the primitive
-	# builder entirely. Pre-made models are expected to have feet at Y=0
-	# and forward = -Z (Godot default), matching the player capsule.
+	# builder entirely. Pre-made models are expected to have feet at Y=0.
 	var glb_path: String = HERO_GLB_PATH % hero_config.hero_id
 	if ResourceLoader.exists(glb_path):
 		var scene: PackedScene = load(glb_path)
@@ -63,6 +67,11 @@ static func build_model(parent: Node3D, hero_config: HeroConfig) -> void:
 			var glb_root: Node3D = scene.instantiate()
 			if glb_root != null:
 				glb_root.name = "MeshInstance3D"
+				glb_root.set_meta("hero_model", true)
+				# GLB exports with the character facing +Z; Godot's forward is
+				# -Z (the convention player_controller's facing logic assumes),
+				# so flip 180° about Y so the model faces its movement/aim.
+				glb_root.rotation.y = PI
 				parent.add_child(glb_root)
 				_apply_hero_tint(glb_root, hero_config.hero_color)
 				_setup_hero_sockets(glb_root, hero_config.hero_id)
@@ -71,6 +80,7 @@ static func build_model(parent: Node3D, hero_config: HeroConfig) -> void:
 
 	var model := Node3D.new()
 	model.name = "MeshInstance3D"  # Keep same name for compatibility
+	model.set_meta("hero_model", true)
 	parent.add_child(model)
 
 	match hero_config.hook_type:

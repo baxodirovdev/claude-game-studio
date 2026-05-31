@@ -1,28 +1,26 @@
-# Epic pudge-animation-pipeline — Stage 2: retarget Mixamo clips onto arm_pudge
-# and export an ANIMATED pudge.glb for Godot.
+# Epic pudge-animation-pipeline — Stage 2: build a fitted skeleton for the Pudge
+# sculpt, retarget Mixamo clips onto it, and export an animated pudge.glb.
 #
-# Prereq: run Stage 1 logic is included here (rig is rebuilt in-memory), and the
-# Mixamo .fbx clips must already be in tools/mixamo/pudge/ (download off any
-# default Mixamo character — no auto-rig upload needed; they carry the standard
-# 65-bone "mixamorig:" skeleton). Edit CLIPS below to add/rename clips.
+# WHY a fitted skeleton: the sculpt is an extreme chibi (huge head/belly, tiny
+# legs, arms bent at the belly sides) holding props. A generic A-pose skeleton
+# does not sit inside those limbs, so binding smears the mesh. build_fitted_rig()
+# instead rebuilds arm_pudge's 20 bones at joint positions measured from the
+# sculpt geometry, so bind pose == the sculpt's own pose and weights track the
+# real limbs. (The small floating hook crescent has been deleted from the mesh.)
 #
-# Method: for every frame, set each target bone's ABSOLUTE world orientation to
-# the matching source bone's (matched by name — arm_pudge bones are renamed to
-# the Mixamo standard first). This reproduces the source pose directly and is
-# rest-agnostic, so it does NOT double-count the Mixamo T-pose vs arm_pudge
-# A-pose difference (a rest-relative delta does, and crumples the mesh). Hips
-# translation is scaled to Pudge's height; horizontal is stripped per-clip
-# (walk = in-place so gameplay drives position).
+# Retarget method: each target bone takes the source bone's ABSOLUTE world
+# orientation (rest-agnostic — reproduces the Mixamo pose directly). The spine
+# chain is DAMPED toward rest (DAMP) so Mixamo's tall-figure torso lean does not
+# tip the short, big-headed chibi over. Hips horizontal translation is stripped
+# per-clip (walk = in place).
 #
-# NOTE: auto-weights are test-quality (story-009 does real weight paint) and the
-# fused hook prop deforms poorly — motion is recognizable, not shipping quality.
-# NOTE: Godot sanitizes bone ":" -> "_" on import; the loader sockets use the
-# "mixamorig_" form (hero_model_builder.gd, epic story-001).
+# Bone names use the Mixamo "mixamorig:" form in Blender; Godot sanitizes ":" to
+# "_" on import (the loader sockets use mixamorig_, epic story-001).
 #
 # Run:
 #   blender --background src/assets/models/heroes/anime_pudge.blend \
 #           --python tools/blender/heroes/retarget_pudge_mixamo.py
-# Output: src/assets/models/heroes/pudge.glb (skin + named actions). .blend untouched.
+# Output: src/assets/models/heroes/pudge.glb. .blend untouched (not saved).
 
 import bpy
 import os
@@ -39,7 +37,39 @@ CLIPS = [
     ("Throwing.fbx",           "hook_throw", False),
 ]
 
-REMAP = {"Chest": "Spine2"}  # arm_pudge "Chest" == Mixamo "Spine2"
+# Joint head positions (world m) measured from the sculpt. Character LEFT = -X.
+JOINTS = {
+    "Hips": (0.00, 0.10, 0.30), "Spine": (0.00, 0.06, 0.45), "Spine1": (0.00, 0.00, 0.60),
+    "Spine2": (0.00, -0.10, 0.74), "Neck": (0.00, -0.10, 0.90), "Head": (0.00, -0.03, 0.97),
+    "LeftShoulder": (-0.10, -0.08, 0.86), "LeftArm": (-0.42, -0.10, 0.81),
+    "LeftForeArm": (-0.54, -0.07, 0.63), "LeftHand": (-0.60, -0.05, 0.50),
+    "RightShoulder": (0.10, -0.08, 0.86), "RightArm": (0.42, -0.10, 0.81),
+    "RightForeArm": (0.54, 0.10, 0.63), "RightHand": (0.60, 0.11, 0.49),
+    "LeftUpLeg": (-0.18, 0.00, 0.32), "LeftLeg": (-0.30, -0.03, 0.17), "LeftFoot": (-0.40, -0.05, 0.06),
+    "RightUpLeg": (0.18, 0.00, 0.32), "RightLeg": (0.28, -0.03, 0.17), "RightFoot": (0.34, -0.05, 0.06),
+}
+PARENT = {
+    "Spine": "Hips", "Spine1": "Spine", "Spine2": "Spine1", "Neck": "Spine2", "Head": "Neck",
+    "LeftShoulder": "Spine2", "LeftArm": "LeftShoulder", "LeftForeArm": "LeftArm", "LeftHand": "LeftForeArm",
+    "RightShoulder": "Spine2", "RightArm": "RightShoulder", "RightForeArm": "RightArm", "RightHand": "RightForeArm",
+    "LeftUpLeg": "Hips", "LeftLeg": "LeftUpLeg", "LeftFoot": "LeftLeg",
+    "RightUpLeg": "Hips", "RightLeg": "RightUpLeg", "RightFoot": "RightLeg",
+}
+TAIL = {  # explicit tails for leaf bones
+    "Head": (0.00, 0.06, 1.32), "LeftHand": (-0.62, -0.05, 0.40), "RightHand": (0.62, 0.11, 0.40),
+    "LeftFoot": (-0.42, -0.16, 0.04), "RightFoot": (0.36, -0.16, 0.04),
+}
+TAIL_TOWARD = {  # non-leaf tails point at this child's head
+    "Hips": "Spine", "Spine": "Spine1", "Spine1": "Spine2", "Spine2": "Neck", "Neck": "Head",
+    "LeftShoulder": "LeftArm", "LeftArm": "LeftForeArm", "LeftForeArm": "LeftHand",
+    "RightShoulder": "RightArm", "RightArm": "RightForeArm", "RightForeArm": "RightHand",
+    "LeftUpLeg": "LeftLeg", "LeftLeg": "LeftFoot", "RightUpLeg": "RightLeg", "RightLeg": "RightFoot",
+}
+# Spine chain damped toward rest so the chibi stays upright (1.0 = full motion).
+DAMP = {
+    "mixamorig:Hips": 0.5, "mixamorig:Spine": 0.45, "mixamorig:Spine1": 0.45,
+    "mixamorig:Spine2": 0.5, "mixamorig:Neck": 0.6, "mixamorig:Head": 0.6,
+}
 
 
 def deselect_all():
@@ -48,26 +78,52 @@ def deselect_all():
 
 
 def rig_target():
+    """Rebuild arm_pudge fitted to the sculpt, bind + smooth weights."""
     arm = bpy.data.objects["arm_pudge"]
     body = bpy.data.objects["mesh_pudge_body_lod0"]
+
     bpy.ops.object.mode_set(mode="OBJECT")
     deselect_all()
     arm.select_set(True)
     bpy.context.view_layer.objects.active = arm
     bpy.ops.object.mode_set(mode="EDIT")
-    for eb in list(arm.data.edit_bones):
-        eb.name = "mixamorig:" + REMAP.get(eb.name, eb.name)
+    eb = arm.data.edit_bones
+    for b in list(eb):
+        eb.remove(b)
+    made = {}
+    for name, head in JOINTS.items():
+        e = eb.new("mixamorig:" + name)
+        e.head = Vector(head)
+        e.tail = Vector(TAIL[name]) if name in TAIL else Vector(JOINTS[TAIL_TOWARD[name]])
+        if (e.tail - e.head).length < 0.02:
+            e.tail = e.head + Vector((0, 0, 0.05))
+        made[name] = e
+    for name, par in PARENT.items():
+        made[name].parent = made[par]
     bpy.ops.object.mode_set(mode="OBJECT")
+
+    # bind
     deselect_all()
     body.select_set(True)
     bpy.context.view_layer.objects.active = body
     if body.parent is not None:
         bpy.ops.object.parent_clear(type="CLEAR_KEEP_TRANSFORM")
+    body.vertex_groups.clear()
     deselect_all()
     body.select_set(True)
     arm.select_set(True)
     bpy.context.view_layer.objects.active = arm
     bpy.ops.object.parent_set(type="ARMATURE_AUTO")
+
+    # smooth weights to reduce smearing across joints
+    deselect_all()
+    body.select_set(True)
+    bpy.context.view_layer.objects.active = body
+    bpy.ops.object.mode_set(mode="WEIGHT_PAINT")
+    bpy.ops.object.vertex_group_smooth(group_select_mode="ALL", factor=0.5, repeat=4)
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+    print("[rig] fitted skeleton built and bound")
     return arm
 
 
@@ -113,7 +169,13 @@ def retarget_clip(tgt, src, name, strip_horiz, order, RT_world):
         MS = {n: src.matrix_world @ src.pose.bones[n].matrix for n in common}
         for n in common:
             tpb = tgt.pose.bones[n]
-            world_rot = MS[n].to_3x3().normalized().to_4x4()
+            src_rot = MS[n].to_3x3().normalized()
+            damp = DAMP.get(n, 1.0)
+            if damp < 1.0:
+                rest_q = RT_world[n].to_3x3().normalized().to_quaternion()
+                world_rot = rest_q.slerp(src_rot.to_quaternion(), damp).to_matrix().to_4x4()
+            else:
+                world_rot = src_rot.to_4x4()
             if n == "mixamorig:Hips":
                 disp = MS[n].to_translation() - RS_world[n].to_translation()
                 head = tgt_hips_rest + Vector((0, 0, disp.z) if strip_horiz else disp) * k
