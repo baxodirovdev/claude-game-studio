@@ -11,8 +11,18 @@
 > LOD); wrote `design/gdd/asset-records/pudge_stage4_sculpt_cleanup.md` checklist; saved .blend.
 > Mesh is a single connected island (no loose artifacts) — the −X head/shoulder protrusion
 > (708 verts, z 1.12–1.28, x −0.68→−0.30) is *connected* surface → flagged in checklist for human
-> sculpt, NOT script-deleted. **Next**: user sculpts face/belly/arm + removes −X artifact in Blender,
-> then Stage 5 (Retopo).
+> sculpt, NOT script-deleted.
+>
+> **2026-06-18 CORRECTION — "4 arms" was a mis-read; reverted.** An attempted scripted cut
+> (extract left-upper to a ref object + delete right-upper) was based on a wrong "spurious extra
+> arms" reading. Top-down + front ortho confirmed the mesh has **exactly two arms in a ~T-pose**
+> (correct riggable bind pose) — the "4 arms" look was the **hook blade + chain coils fused onto
+> the hands**, not real limbs. All cuts **fully reverted** to the clean 19,147-vert backup;
+> partial-cut ref object/collection removed; .blend re-saved clean. **User decision: leave the mesh
+> as-is** (good 2-arm T-pose base); the fused hook/chain are **deferred to a later prop-separation
+> task** (task #13), keeping the left (+X) fused hook/chain as the shape reference. Checklist
+> corrected accordingly. **Next**: face/belly/arm-form sculpt refinement (no bulk cutting), then
+> Stage 5 (Retopo).
 
 > **2026-06-18 verdict**: `/design-review design/gdd/models/pudge.md` re-run (lean depth — full-mode
 > specialist subagents are blocked under the 1M-context model without usage credits) returned

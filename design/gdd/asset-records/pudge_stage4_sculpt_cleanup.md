@@ -41,18 +41,31 @@ rotation hack. (Contract §9 / O-2 — verified PASS at Stage 4 entry.)
 
 ---
 
+## ⚠️ Corrected understanding (2026-06-18) — it's a 2-arm T-pose, NOT "4 arms"
+
+An earlier pass mis-read this mesh as having spurious extra-arm artifacts to bulk-delete.
+**That was wrong and has been fully reverted** (mesh restored to the clean 19,147-vert
+backup). Verified by top-down + front ortho:
+
+- The mesh has **exactly two arms**, held out to the sides ≈ **T-pose** — the correct,
+  riggable bind pose. **Keep both arms. Do not bulk-cut them.**
+- The "4 arms" look came from the **hook blade (left/+X hand) and chain coils** being
+  **fused onto the hands/forearms** by the AI generator — props reading as extra limbs,
+  not actual limbs.
+
+**Decision (user, 2026-06-18): leave the mesh as-is.** The body is an acceptable 2-arm
+T-pose base for rigging. The fused hook/chain are deferred to a **later prop-separation
+task** (see "Deferred" below), not cut during this sculpt pass.
+
 ## 🎨 Your sculpt tasks (in Blender)
 
-### 1. Remove the −X head/shoulder AI artifact  **[HIGH — silhouette]**
-- **What**: A spurious protrusion on the character's **right (−X)** at head/shoulder height —
-  **708 verts, z 1.12–1.28, x −0.68 → −0.30**. Concept has *no* appendage there (no horn, ear,
-  or shoulder spike on the right). Classic Hunyuan/AI mesh artifact.
-- **How**: Sculpt-mode **Mask** the blob (or box-select in Edit mode in Front/Right ortho),
-  then Grab/Smooth it back into the shoulder line, or delete the masked region and patch.
-  The head silhouette should read as a **small round head sunk into hunched shoulders**
-  (near-neckless, 1–2 cm neck stub), not a lumpy mass spanning x ±0.7.
-- **Check**: After fix, head-band x-extent (z 1.10–1.40) should be roughly symmetric and
-  *narrower* than the shoulders below it.
+### 1. (DEFERRED) Hook/chain → separate prop — NOT this pass
+- The hook + chain are currently **fused onto the hands**. They must eventually become the
+  separate `mesh_pudge_hook` prop (attached at `socket_hook_hand`), because the hook is
+  **thrown** and a clean hand weight-paints/animates far better.
+- **Per user decision this is deferred** — do *not* peel it now. Keep the **left (+X)** fused
+  hook/chain intact as a **shape reference** for authoring the real prop later.
+- Tracked as a separate task; revisit at prop-authoring (alongside Stage 5 retopo), not here.
 
 ### 2. Face refinement to concept  **[HIGH — reads at gameplay camera]**
 - Grotesque-jovial butcher grin: **crooked / mismatched teeth** (teeth are a strip, per model spec).
@@ -66,13 +79,11 @@ rotation hack. (Contract §9 / O-2 — verified PASS at Stage 4 entry.)
 - Note the **`jiggle_boundary` zone** (contract §6, 2-color red/white + pink gradient): keep
   belly surface clean and even so weight-paint / jiggle keyframes deform predictably later.
 
-### 4. Hook hand / arm refinement  **[MED]**
+### 4. Arm refinement  **[MED]**
 - Confirm the **left (+X) arm is visibly heavier** than the right (it already carries more mass —
   refine, don't rebuild). Beefy forearm, chunky gripping hand.
-- The **hook + chain are a separate prop** (`mesh_pudge_hook`, attached at `socket_hook_hand`
-  later) — do **not** sculpt a fused hook into the body. If any hook/chain geometry is fused
-  into this AI mesh, remove it (it will be replaced by the prop). Chain **coil sits on the
-  left hip (+X)** as a sculpted/painted detail only if it deforms with the body; otherwise it's prop.
+- **Leave the fused hook/chain alone this pass** (deferred — see task 1). Refine only the
+  arm/hand *form*; the prop-separation happens later.
 
 ### 5. Belt / apron  **[LOW]**
 - Brown leather **belt** at the waist; small **bloodied apron stub** under the belt (merged into
