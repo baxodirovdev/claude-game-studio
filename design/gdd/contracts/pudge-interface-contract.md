@@ -728,13 +728,23 @@ Tracked in §11 open items.
 
 ---
 
-## 9. Forward-Axis Verification (DEFERRED to Stage 4)
+## 9. Forward-Axis Verification (✅ RESOLVED — Stage 4 entry, 2026-06-18)
 
 ### Status
 
-**Stage 4 entry criterion.** Per Q2 decision this session, the axis check on
-the current `src/assets/models/heroes/anime_pudge.blend` working file is
-deferred from this session to the start of Stage 4 (sculpt cleanup).
+**✅ RESOLVED — PASS (2026-06-18, Stage 4 entry).** Verified via Blender MCP:
+`pudge_v2_remesh` rendered in Front Orthographic (`view_axis FRONT`) shows the
+**face** (head with facial features, belly bulging toward viewer, arms out); the
+Back view shows the rounded back with no face. **Face visible in front view = mesh
+faces -Y in Blender = exports to -Z in Godot natively.** No rotation fix needed.
+Transforms confirmed clean at the same time: location (0,0,0), rotation (0,0,0),
+scale (1,1,1); world bbox Z = [0.005, 1.399] (feet ≈ Z0, height ≈ 1.4 m). The
+`glb_root.rotation.y = PI` hack at `hero_model_builder.gd:74` can therefore be
+removed once the new GLB ships (Stage 10), as §2 intends.
+
+The original deferral note (kept for history): per Q2 decision, the axis check on
+the `src/assets/models/heroes/anime_pudge.blend` working file was deferred to the
+start of Stage 4 (sculpt cleanup).
 
 ### What to verify
 
@@ -846,7 +856,7 @@ must close their items by the listed deadline or escalate.
 | ID | Item | Source section | Owner | Deadline | Status |
 |---|---|---|---|---|---|
 | O-1 | Target device tier (Q1) | §8 | technical-director + producer | Before Stage 7 | DEFERRED |
-| O-2 | Mesh axis verification (Q2) | §9 | blender-specialist | Stage 4 entry | DEFERRED |
+| O-2 | Mesh axis verification (Q2) | §9 | blender-specialist | Stage 4 entry | ✅ RESOLVED 2026-06-18 — PASS, face visible in front ortho, mesh faces -Y, no fix needed |
 | O-3 | Movement speed reconciliation | §10 | gameplay-programmer | Stage 9 entry | NEW — needs resolution |
 | O-4 | BellyJiggle spring API exists in Godot 4.6? | §4.1 | Step 5 (verified 2026-05-31) | Stage 8 entry | **RESOLVED — NO.** Godot 4.6 has CCDIK, FABRIK, Jacobian IK, Spline IK, TwoBoneIK + 4.5's BoneConstraint3D (AimModifier3D, CopyTransformModifier3D, ConvertTransformModifier3D). **No spring/jiggle modifier exists.** Two paths: (A) write a custom `SkeletonModifier3D` GDScript subclass (~50 lines, evaluates spring physics each frame), or (B) keyframe BellyJiggle in all 10 animation clips. Recommend **(B) for MVP** — eliminates engine-API risk, costs ~20% more animator time. Revisit (A) post-MVP if profiling shows keyframe drift. |
 | O-5 | LOD auto-detect by `_lod*` suffix works for pre-authored LODs? | §3 of model spec | Step 5 (verified 2026-05-31) | Stage 10 entry | **RESOLVED — NO.** Godot's `_lod*` suffix detection is a *proposal*, not implemented in 4.6. Godot 4.6 auto-generates LODs from a single source mesh via meshoptimizer, but does **not** group pre-authored separate meshes by suffix. **Correct workflow**: import each LOD as its own `MeshInstance3D`, configure `visibility_range_begin/end` per instance, disable LOD auto-generation in import settings. Model spec §10 must drop the "auto-detect by suffix" claim and document the per-MeshInstance3D `visibility_range_*` setup at Stage 10. |
@@ -876,15 +886,15 @@ the change required.
 
 ### Design documents
 
-- [ ] `design/gdd/models/pudge.md` §1 — remove "Conflicts with: rig + materials specs" line; replace with "Implements contract at `design/gdd/contracts/pudge-interface-contract.md`"
-- [ ] `design/gdd/models/pudge.md` §3 — replace 3-color jiggle_boundary encoding (red/yellow/white) with 2-color (red/white) per §6 of this contract
-- [ ] `design/gdd/models/pudge.md` §5 — remove "BaseColor alpha = tint mask" section; replace with "Tint mask delivered as dedicated `body_tintmask.png` per contract §7"
-- [ ] `design/gdd/models/pudge.md` §7 — replace 5 socket position rows with values from contract §5 (rig-spec coordinates with mixamorig:* parent names)
-- [ ] `design/gdd/models/pudge.md` §9 — confirm bone count = 22 MVP (Jaw included, ChainLink excluded), remove the "25 full" line as misleading (chain is post-MVP, full count = 26 with chain)
-- [ ] `design/gdd/models/pudge.md` §10 — update texture paths to `src/assets/textures/heroes/pudge/` with no `pudge_` prefix on filenames
-- [ ] `design/gdd/models/pudge.md` §11 F.4 — rewrite "under 16 ms on mid-tier device" with concrete device once O-1 resolves
-- [ ] `design/gdd/models/pudge.md` §2 LOD table — mark LOD3 impostor row as POST-MVP per O-13; document that LOD2 extends to infinity for MVP
-- [ ] `design/gdd/models/pudge.md` §10 — drop the "Godot's glTF importer auto-detects `_lod0`/`_lod1`/`_lod2` suffixes" claim per O-5. Add Stage 10 task: configure `visibility_range_begin` + `visibility_range_end` per LOD `MeshInstance3D` in the imported scene; disable Godot's automatic LOD generation in import settings (set "Generate LODs" to false).
+- [x] `design/gdd/models/pudge.md` §1 — remove "Conflicts with: rig + materials specs" line; replace with "Implements contract at `design/gdd/contracts/pudge-interface-contract.md`" *(done 2026-06-18)*
+- [x] `design/gdd/models/pudge.md` §3 — replace 3-color jiggle_boundary encoding (red/yellow/white) with 2-color (red/white) per §6 of this contract *(done 2026-06-18; §9 influence table "yellow region" also fixed)*
+- [x] `design/gdd/models/pudge.md` §5 — remove "BaseColor alpha = tint mask" section; replace with "Tint mask delivered as dedicated `body_tintmask.png` per contract §7" *(done 2026-06-18; shader uniforms/logic, VRAM table, set_instance_shader_parameter note all updated)*
+- [x] `design/gdd/models/pudge.md` §7 — replace 5 socket position rows with values from contract §5 (rig-spec coordinates with mixamorig:* parent names) *(done 2026-06-18; world-position verification table updated too)*
+- [x] `design/gdd/models/pudge.md` §9 — confirm bone count = 22 MVP (Jaw included, ChainLink excluded), remove the "25 full" line as misleading (chain is post-MVP, full count = 26 with chain) *(done 2026-06-18)*
+- [x] `design/gdd/models/pudge.md` §10 — update texture paths to `src/assets/textures/heroes/pudge/` with no `pudge_` prefix on filenames *(done 2026-06-18; §11.C deliverables list updated too)*
+- [x] `design/gdd/models/pudge.md` §11 F.4 — rewrite "under 16 ms on mid-tier device" with concrete device once O-1 resolves *(done 2026-06-18; F.4 split into F.4a dev-smoke + F.4b target-device acceptance, device deferred to O-1)*
+- [x] `design/gdd/models/pudge.md` §2 LOD table — mark LOD3 impostor row as POST-MVP per O-13; document that LOD2 extends to infinity for MVP *(done in prior session; verified)*
+- [x] `design/gdd/models/pudge.md` §10 — drop the "Godot's glTF importer auto-detects `_lod0`/`_lod1`/`_lod2` suffixes" claim per O-5. Add Stage 10 task: configure `visibility_range_begin` + `visibility_range_end` per LOD `MeshInstance3D` in the imported scene; disable Godot's automatic LOD generation in import settings (set "Generate LODs" to false). *(done 2026-06-18)*
 - [ ] `design/gdd/rigs/pudge.md` §4.1 — drop the "spring if Godot 4.6 supports it, else keyframe" conditional per O-4; lock to keyframe-only for MVP. Move spring-modifier discussion to a "post-MVP polish" footnote.
 - [ ] `design/gdd/rigs/pudge.md` §1 — rewrite bone hierarchy with `mixamorig:` prefix, rename `Chest` → `Spine2`, drop ChainLink1-4 (post-MVP)
 - [ ] `design/gdd/rigs/pudge.md` §2 — rewrite bind pose joint angle table for T-pose (LeftArm Z=0, RightArm Z=0, spine Z=0 with no hunch in bind)
@@ -893,13 +903,14 @@ the change required.
 - [ ] `design/gdd/rigs/pudge.md` §13 — rewrite bone naming table with `mixamorig:` prefix throughout
 - [ ] `design/gdd/materials/pudge.md` §13 — confirm path `src/assets/textures/heroes/pudge/` and prefix-free naming (already matches; no change needed)
 - [ ] `design/gdd/materials/pudge.md` §14 — confirm shader is custom `ShaderMaterial` with mask-based tint per contract §7 (already matches)
-- [ ] `design/gdd/hero-system.md` — add Pudge as 4th hero per O-9
+- [x] `design/gdd/hero-system.md` — add Pudge as 4th hero per O-9 *(PARTIAL — roster entry done Step 9; stat balance still TBD before Stage 10)*
 
 ### Code
 
 - [ ] `src/gameplay/hero/hero_model_builder.gd:25-46` — rewrite `HERO_SOCKETS` constant with the 5 socket entries from contract §5 (correct parent bones, correct local offsets, correct rotations)
 - [ ] `src/gameplay/hero/hero_model_builder.gd:74` — remove the `glb_root.rotation.y = PI` line once the new GLB ships built to contract §2 (faces -Z natively)
 - [ ] `res://assets/shaders/hero_body_tint.gdshader` — rewrite from hue-band detection to mask-based per contract §7 shader formula; add `tint_mask_texture` sampler uniform
+- [ ] `src/gameplay/hero/hero_model_builder.gd:401-412` (`_apply_hero_tint`) — switch from `set_shader_parameter("tint_color", …)` (per-material) to a **shared** `ShaderMaterial` + per-instance `set_instance_shader_parameter("team_tint_color", color)` on each `MeshInstance3D` (per O-6). Current code mints a fresh `ShaderMaterial` per build and sets the tint per-material; once §7 textures are bound this inflates VRAM ~10× (a unique textured material per instance). Also rename the uniform `tint_color` → `team_tint_color` and drop `tint_strength` to match the §7 shader contract. Stage 10 code task.
 
 ### Tools
 

@@ -80,3 +80,32 @@ Creative-director recommendation: 1 focused session (~6 hours) of mechanical pro
 2. **Resolve the three Step 7 regressions** (require actual decisions): (a) Split F.4 into F.4a prototype smoke + F.4b Stage 10 acceptance; (b) Bootstrap `production/qa/godot-acceptable-warnings.md` as empty versioned stub NOW; (c) Switch §F.3 pixel measurements to UV-space OR pin viewport "1920×1080, HiDPI disabled" with named screenshot tool.
 
 3. **Add `set_instance_shader_parameter` requirement to spec body** + file separate code task for `hero_model_builder.gd:401-412`. Out of scope for this spec review but must be documented so future programmer doesn't miss it.
+
+---
+
+## Review — 2026-06-18 — Verdict: APPROVED
+
+**Depth**: `lean` (single-session, no specialist subagents — full-mode specialist spawn is blocked under the active 1M-context model without usage credits; the structural + consistency + testability analysis below was performed directly against the interface contract). Re-review of the 2026-05-31 NEEDS REVISION verdict.
+
+**Scope signal**: L (carried over — multi-section spec, contract-coupled). No new ADRs.
+
+**Blocking items**: 0 | **Recommended**: 2 (advisory, non-blocking)
+
+**Summary**:
+
+The contract-propagation cleanup the 2026-05-31 review prescribed is complete and verified. All 15 prior BLOCKING items shared a single root cause — *the interface contract was correct but its decisions had not been propagated into the model-spec body text* — and every propagation target now matches the contract on a value-by-value cross-check:
+
+- **§3 / §9 jiggle** — 2-color (red/white) + linear pink gradient, matching contract §6. No residual yellow band.
+- **§5 / §10 / §11.C materials** — dedicated `body_tintmask.png` as the 5th body map; BaseColor is pure RGB (no alpha tint); `team_tint_color` is the only per-instance uniform, samplers stay per-material (contract §7 + O-6); ETC2 baseline ~2.05 MB / ~2.73 MB-with-mips VRAM (contract O-7); texture path `src/assets/textures/heroes/pudge/` with no `pudge_` filename prefix.
+- **§7 sockets** — all five socket transforms verbatim from contract §5, including the corrected `socket_hit_center` (0,0,+0.12) and `socket_hook_hand` (0,0,-0.05)/(-15,0,0); world-position verification table consistent.
+- **§9 skeleton** — MVP bone count 22 (Jaw included, 4× ChainLink post-MVP, full = 26); the stale "25" is gone; BellyJiggle keyframed in all 10 clips (contract O-4, no Godot 4.6 spring modifier).
+- **§10 LODs** — false `_lod*` auto-detect claim replaced with the manual `visibility_range_begin/end` + "Generate LODs off" workflow (contract O-5).
+- **§12** — Q12.4/8/9/10/14 RESOLVED, Q12.13/20 DEFERRED, Q12.18 PARTIAL, each citing its contract ID; Decision Status Table consistent.
+
+The three regressions Step 7 introduced are all closed: F.4 is split into F.4a (dev-machine smoke, informational, any build) and F.4b (target-device acceptance, binding, Stage 10 GLB only) with the VRAM figure corrected; the F.2 circular dependency is broken by the pre-existing versioned stub at `production/qa/godot-acceptable-warnings.md`; and §F.3's pixel measures are pinned to a 1920×1080 HiDPI-disabled capture with the silhouette measure moved to world-space AABB. The `set_instance_shader_parameter` requirement is documented in §5 and §11.H and filed as a Stage 10 code task. Dependency graph: all 11 referenced files (contract, rig spec, materials spec, brief, concept, warnings stub, stress scene, perf README, both Blender validators, loader) exist on disk.
+
+**Recommended (advisory, do NOT block Stage 3)**:
+1. The remaining open items are all correctly *deferred and tracked*, not unresolved: O-1 target device (gates F.4b only), rig-spec propagation (contract §12 rig rows still open — separate Stage 8 task), `pudge.tres` stat balance (debug placeholders — game-designer, before Stage 10), and the four Stage 10 code tasks (HERO_SOCKETS update, rotation-hack removal, shader rewrite, `set_instance_shader_parameter`). None block the model spec.
+2. This verdict is a **lean** review. The two prior verdicts were full 6-specialist adversarial passes. If the studio wants an equally-authoritative specialist sign-off for the phase gate, re-run `/design-review` in full mode once usage credits are enabled (or under a standard-context model).
+
+**Prior verdict resolved**: Yes — all 15 BLOCKING items from 2026-05-31 plus the 3 Step-7 regressions are resolved and verified.

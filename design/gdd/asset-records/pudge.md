@@ -1,11 +1,35 @@
 # Pudge — Asset Record
 
-> **Status**: Specs complete (stages 1-5). Authoring in progress (stage 6) — **AI-mesh retopo path**.
+> **Status**: Specs complete. **Stage 3 (Model Spec) APPROVED 2026-06-18**; **Stage 4 (Sculpt cleanup) in progress** — AI-mesh retopo path.
 > **Hero ID**: `pudge`
 > **Asset class**: Character (humanoid, deformable, animated)
-> **Date**: 2026-04-28 (updated 2026-05-22)
+> **Date**: 2026-04-28 (updated 2026-05-22; reconciled to interface contract 2026-06-18)
 
 This record links every produced spec and tracks asset progress end-to-end.
+
+---
+
+## ⚠️ Source-of-truth precedence — reconciled 2026-06-18
+
+This record predates `design/gdd/contracts/pudge-interface-contract.md`, which is now
+the **single source of truth**. Where this record disagrees with the contract, the
+**contract wins**. The following values in this document are **SUPERSEDED** and have
+been corrected inline below:
+
+| Stale value (this record) | Authoritative value (contract / model spec) | Contract ref |
+|---|---|---|
+| **27 bones** | **22 bones MVP** (incl. Jaw), **26 full** (+4× ChainLink) | §3, O-4 |
+| **Bind pose: A-pose** | **T-pose** (arms out, palms down) | §2 |
+| **BellyJiggle: runtime spring (Godot)** | **Keyframed in all 10 clips** — no Godot 4.6 spring/jiggle modifier exists | O-4 |
+| **LOD auto-detect (`_lod*` / `mesh_pudge_body_lod0` rename)** | **Manual `visibility_range_begin/end`** per LOD; "Generate LODs" OFF | O-5 |
+| Texture filenames w/ `pudge_` prefix (none here, but enforced elsewhere) | `body_*.png` / `hook_*.png`, no prefix, under `src/assets/textures/heroes/pudge/` | §7 |
+
+**Stage-numbering note:** the "Stage outputs" table below numbers *spec-authoring*
+stages (0 Brief … 5 Pipeline … 6 Authoring). The **production pipeline** uses a
+different art-stage axis (1 Brief, 2 Base-mesh prep, 3 Model Spec, 4 Sculpt cleanup,
+5 Retopo, 6 UV, 7 Texturing, 8 Rigging, 9 Animation, 10 Godot export). The current
+position is **pipeline Stage 4 (Sculpt cleanup)**, which corresponds to this record's
+"Stage 6 Authoring (sculpt sub-phase)".
 
 ---
 
@@ -68,13 +92,13 @@ rig-independent and still applies to the final rigged GLB.
 | Body texture | 1024², 5 maps (BC, N, ORM, Emissive 256², TintMask) | Texture spec §3 |
 | Hook texture | 512², 3 maps (BC, N, ORM) | Texture spec §3 |
 | Body shader | Custom ShaderMaterial (tint multiply) | Texture spec §15 |
-| Bones | 27 (≤45 target, ≤50 ceiling) | Rig spec §2 |
-| Bind pose | A-pose (raised arm via idle anim layer) | Brief §5, concept §B |
+| Bones | **22 MVP / 26 full** (Jaw incl.; +4× ChainLink post-MVP) — *was 27* | Contract §3, O-4 |
+| Bind pose | **T-pose** (arms out, palms down) — *was A-pose* | Contract §2 |
 | IK | FK baked in Blender → `SkeletonModification3DTwoBoneIK` engine-side | Rig spec §6 |
-| BellyJiggle | Runtime spring (Godot), not keyframed | Pipeline §"Authoritative decision" |
+| BellyJiggle | **Keyframed in all 10 clips** (no Godot 4.6 spring modifier) — *was runtime spring* | Contract O-4 |
 | Animations | 10 clips, 267 frames @ 30 fps, in-place | Brief §4, rig spec §8 |
 | Sockets | 5 (`socket_hook_hand`, `_offhand`, `_chain_origin`, `_hit_center`, `_head_top`) | Brief §6, rig spec §7 |
-| LODs | LOD0 hand / LOD1-2 Decimate / LOD3 impostor | Pipeline §13 |
+| LODs | LOD0 hand / LOD1-2 Decimate / LOD3 impostor; **manual `visibility_range`** (no auto-detect) | Contract O-5 |
 | Apron | Yes, merged into body mesh, blooded stub under belt | Brief §6 |
 
 ---
@@ -108,8 +132,8 @@ rig-independent and still applies to the final rigged GLB.
 | 3 | character-artist | Conditional: corrective blendshape `correct_leftarm_raised` if QA1 fails | rig deformation gate | conditional |
 | 4 | rigger | Confirm `mesh_pudge_hook` has 100% LeftHand weight | export validation | open |
 | 5 | gameplay-programmer | Confirm `hook_release` frame 6 timing & `hit_active` frame 7 timing | animation finalize | deferable to Stage 8 |
-| 6 | character-artist | Rename `mesh_pudge_body` → `mesh_pudge_body_lod0` for LOD auto-detect | export validation | open |
-| 7 | character-artist | Audit BellyJiggle has zero animation tracks (except in `death`) | runtime spring vs baked conflict | open |
+| 6 | character-artist | ~~Rename for LOD auto-detect~~ **SUPERSEDED** — LODs use manual `visibility_range` (contract O-5), no name-based auto-detect | export validation | superseded |
+| 7 | character-artist | ~~Audit BellyJiggle has zero anim tracks~~ **SUPERSEDED** — BellyJiggle is **keyframed in all clips** (contract O-4); no runtime spring | n/a | superseded |
 | 8 | technical-artist | Verify Godot 4.6 `meshes/light_baking` and `gltf/embedded_image_handling` enum values | Godot import preset finalization | Stage 8 |
 | 9 | technical-artist | Build custom shader for body tint multiply | material setup | Stage 8 |
 | 10 | technical-artist | Add 12 animation event method tracks manually (Blender pose markers don't transfer) | event firing | Stage 8 |

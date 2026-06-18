@@ -1,6 +1,6 @@
 # Model Spec — Pudge
 
-> **Status**: ⚠️ **MAJOR REVISION NEEDED** — /design-review 2026-05-30 surfaced 27 BLOCKING items across 6 specialist reviews. **Do NOT proceed to Stage 4 until revisions complete.** See `design/gdd/reviews/pudge-model-review-log.md` for full review record and `production/session-state/active.md` for resume instructions.
+> **Status**: ✅ **APPROVED — Stage 3 model spec complete (2026-06-18)** — body text aligned to the interface contract; `/design-review` re-run (lean) verdict APPROVED. Cleared to begin Stage 4 (sculpt cleanup). Prior review (2026-05-31) verdict was NEEDS REVISION (15 BLOCKING, root cause: contract decisions not propagated into this spec's body). See `design/gdd/reviews/pudge-model-review-log.md` for review history and `production/session-state/active.md` for resume instructions.
 > **Hero ID**: `pudge` (separate 4th hero — not in current Vex/Lash/Maw roster; hero-system.md needs updating later)
 > **Stage**: 3 of 10 (Model Specification)
 > **Date**: 2026-05-30
@@ -8,7 +8,7 @@
 > **Concept**: `design/concept-art/pudge.md` — Silhouette B (Coiled Hook Carry) APPROVED 2026-04-28
 > **Predecessor spec**: archived to `design/gdd/models/_archive/pudge.md.2026-04-28` (superseded by fresh Stage 3 authoring this session)
 > **Engine**: Godot 4.6
-> **Conflicts with**: `design/gdd/rigs/pudge.md` and `design/gdd/materials/pudge.md` — cross-doc reconciliation required before any specialist begins implementation
+> **Implements contract**: `design/gdd/contracts/pudge-interface-contract.md` — the single source of truth for bone names, socket transforms, jiggle encoding, tint-mask delivery, bind pose, axes, and bone count. Where this spec and the contract disagree, **the contract wins** and this spec is the document to fix. Cross-doc reconciliation with `design/gdd/rigs/pudge.md` and `design/gdd/materials/pudge.md` is resolved through that contract.
 
 This document is the written contract between modeling and all downstream consumers
 (texture-artist, rigging-animator, blender-specialist, technical-artist, gameplay-programmer).
@@ -224,12 +224,12 @@ protrusion point — NOT the anatomical waist):
 ```
    Z (up)
     |
-    +-- Ring 6 (top, transitioning to torso/chest)        ← 0% jiggle
-    +-- Ring 5                                            ← 0% jiggle (transition)
-    +-- Ring 4                                            ← 50% jiggle (gradient)
-    +-- Ring 3 (EQUATOR — maximum circumference)          ← 100% jiggle
-    +-- Ring 2                                            ← 100% jiggle (forward-lower)
-    +-- Ring 1 (bottom, transitioning to hip mass)        ← 0% jiggle
+    +-- Ring 6 (top, transitioning to torso/chest)        ← 0% jiggle (white)
+    +-- Ring 5                                            ← gradient (pink)
+    +-- Ring 4                                            ← gradient (pink)
+    +-- Ring 3 (EQUATOR — maximum circumference)          ← 100% jiggle (red)
+    +-- Ring 2                                            ← 100% jiggle (red, forward-lower)
+    +-- Ring 1 (bottom, transitioning to hip mass)        ← 0% jiggle (white)
     +-- pole cap (hidden inside torso overlap)
 ```
 
@@ -237,11 +237,11 @@ protrusion point — NOT the anatomical waist):
 - **8 vertical columns** (8-sided radial topology)
 - **96 quads total** on the gut dome = 192 tris (matches budget §2)
 
-**BellyJiggle influence falloff** (painted as `jiggle_boundary` vertex color layer):
+**BellyJiggle influence falloff** (painted as `jiggle_boundary` vertex color layer — **2-color encoding per contract §6**):
 
 - **Red (RGB 1, 0, 0) = 100%**: equator ring (Ring 3) + forward-lower ring (Ring 2)
-- **Yellow (RGB 1, 1, 0) ≈ 50%**: transition rings (Ring 4 above, Ring 1 below)
-- **White (RGB 1, 1, 1) = 0%**: top rings (5, 6) joining torso + lowest ring joining hip
+- **White (RGB 1, 1, 1) = 0%**: top rings (5, 6) joining torso + lowest ring (1) joining hip
+- **Pink gradient between**: the painter does NOT hand-paint a discrete 50% middle band. Blender's vertex-paint gradient/smear tool produces the linear interpolation between the red equator rings and the white join rings. This is simpler for the painter and gives the rigger continuous-domain weights. **The previously-authored 3-color (red/yellow/white) encoding is superseded.**
 
 The rigger reads `jiggle_boundary` directly to assign BellyJiggle weights (capped at
 80% per rig spec — character-artist paints raw 0-100% gradient, rigger applies the cap).
@@ -453,39 +453,51 @@ Single UV channel keeps mesh data lean and import simple.
 
 ## 5. Materials
 
-Two materials, two draw calls, four textures per material. Mobile PBR pipeline with
-**ORM channel packing** (R=AO, G=Roughness, B=Metallic) — industry-standard for mobile
-to halve texture sample count.
+Two materials, two draw calls. **5 maps for the body, 3 for the hook.** Mobile PBR
+pipeline with **ORM channel packing** (R=AO, G=Roughness, B=Metallic) — industry-standard
+for mobile to halve texture sample count. The team-tint mask is delivered as a **dedicated
+5th body map (`body_tintmask.png`)** per contract §7 — **not** packed into the BaseColor
+alpha as earlier drafts of this spec assumed.
 
 ### Material List
 
 | Material | Mesh | Atlas | Shader | Tintable? |
 |---|---|---|---|---|
-| `mat_pudge_body` | `mesh_pudge_body_lod*` | 1024 × 1024 | `hero_body_tint.gdshader` (custom) | **Yes** — team tint via mask channel |
+| `mat_pudge_body` | `mesh_pudge_body_lod*` | 1024 × 1024 | `hero_body_tint.gdshader` (custom `ShaderMaterial`) | **Yes** — team tint via dedicated `body_tintmask.png` |
 | `mat_pudge_hook` | `mesh_pudge_hook_lod*` | 512 × 512 | Godot StandardMaterial3D | **No** — neutral iron, no team tint |
 
 **Draw call budget**: 2 per Pudge instance. With 10 heroes on screen, total mesh draw
 calls = 20 (10 bodies + 10 hooks). Comfortable for mobile renderer.
 
-### Channel Packing — Body Material
+### Channel Packing — Body Material (5 maps)
+
+Per contract §7 the body uses **5 maps**. The tint mask is its own single-channel map,
+**not** the BaseColor alpha. BaseColor stays pure RGB.
 
 | Texture | Resolution | Channels | Content |
 |---|---|---|---|
-| `pudge_body_basecolor.png` | 1024 × 1024 | RGB + A | RGB = hand-painted base color (un-tinted). **A = tint mask** (1.0 = full tint, 0.0 = no tint, smooth gradient permitted at boundaries). |
-| `pudge_body_normal.png` | 1024 × 1024 | RG (B reconstructed) | Tangent-space normal map baked from high-poly. B channel reconstructed at runtime via `sqrt(1 - R² - G²)` to save 1/3 texture size. |
-| `pudge_body_orm.png` | 1024 × 1024 | RGB | **R = AO** (baked combined scene), **G = Roughness**, **B = Metallic** |
-| `pudge_body_emissive.png` | 256 × 256 | RGB | Sparse texture — eyes only. Cropped to the eye UV sub-island to save memory. Black elsewhere. |
+| `body_basecolor.png` | 1024 × 1024 | RGB | Hand-painted base color (un-tinted). **No alpha** — tint lives in `body_tintmask.png`. |
+| `body_normal.png` | 1024 × 1024 | RG (B reconstructed) | Tangent-space normal map baked from high-poly. B channel reconstructed at runtime via `sqrt(1 - R² - G²)` to save 1/3 texture size. |
+| `body_orm.png` | 1024 × 1024 | RGB | **R = AO** (baked combined scene), **G = Roughness**, **B = Metallic** |
+| `body_emissive.png` | 256 × 256 | RGB | Sparse texture — eyes only. Cropped to the eye UV sub-island to save memory. Black elsewhere. |
+| `body_tintmask.png` | 1024 × 1024 | single-channel grayscale (R) | **Team-tint mask** (1.0 = full tint, 0.0 = no tint, soft 1-3 px feather permitted at boundaries). Compresses to BC4 (desktop) / ETC2 R (mobile). |
+
+**Why a dedicated tint-mask map instead of BaseColor alpha** (per contract §7): cleaner
+separation of concerns (BaseColor stays pure RGB), cheaper per-pixel cost (BC4
+single-channel at 0.5 byte/px beats the RGBA BC7 the alpha would force), no coupling
+between BaseColor import settings and shader code, and an unambiguous one-map/one-purpose
+painter workflow. Cost: +~0.17 MB compressed VRAM per hero.
 
 **Why a separate small emissive texture**: the emissive region is ~3% of the body atlas
 (eyes only). Allocating a full 1024 emissive map would waste ~1 MB for one tiny feature.
 A cropped 256 × 256 holding just the eye island region drops emissive cost to ~64 KB.
 
-**Tint mask painting guide** (alpha channel of `pudge_body_basecolor.png`):
+**Tint mask painting guide** (`body_tintmask.png`, single-channel grayscale):
 
-| Surface | Alpha value | Tints to team color? |
+| Surface | Mask value | Tints to team color? |
 |---|---|---|
-| Skin (face, body, arms, legs) | 1.0 | Yes — primary identity |
-| Leather (belt, boots) | 0.0 | No — natural brown |
+| Skin (face, body, arms, legs) | 1.0 (white) | Yes — primary identity |
+| Leather (belt, boots) | 0.0 (black) | No — natural brown |
 | Iron (belt buckle, chain links) | 0.0 | No — neutral metal |
 | Stitches | 0.0 | No — black thread |
 | Eyes (sclera + pupil) | 0.0 | No — yellow + black |
@@ -494,47 +506,65 @@ A cropped 256 × 256 holding just the eye island region drops emissive cost to ~
 | Apron stub | 0.0 | No — bloodied off-white |
 | Blood splatter | 0.0 | No — red |
 
-Texture-artist paints the alpha as 1.0 on all skin regions, 0.0 everywhere else.
-Smooth transition (1-2 px ramp) at skin/cloth boundaries to avoid hard tint edges.
+Texture-artist paints the mask as 1.0 on all skin regions, 0.0 everywhere else.
+Soft feather (1-3 px ramp) at skin/cloth boundaries to avoid hard tint edges;
+hard-edged at all non-skin material boundaries.
 
 ### Channel Packing — Hook Material
 
 | Texture | Resolution | Channels | Content |
 |---|---|---|---|
-| `pudge_hook_basecolor.png` | 512 × 512 | RGB | Hand-painted iron base color + blood spatter on inner curve/tip. No alpha. |
-| `pudge_hook_normal.png` | 512 × 512 | RG (B reconstructed) | Tangent-space normal from fresh high-poly bevel pass (NOT from AI mesh). |
-| `pudge_hook_orm.png` | 512 × 512 | RGB | R = AO (combined scene bake), G = Roughness, B = Metallic |
+| `hook_basecolor.png` | 512 × 512 | RGB | Hand-painted iron base color + blood spatter on inner curve/tip. No alpha. |
+| `hook_normal.png` | 512 × 512 | RG (B reconstructed) | Tangent-space normal from fresh high-poly bevel pass (NOT from AI mesh). |
+| `hook_orm.png` | 512 × 512 | RGB | R = AO (combined scene bake), G = Roughness, B = Metallic |
 
 No emissive on hook prop. No tint mask (hook is always iron-grey).
 
 ### Shader Target — Body
 
-Use the existing `res://assets/shaders/hero_body_tint.gdshader` (already integrated in
-`HeroModelBuilder._apply_hero_tint()`). This spec extends it to use the **mask-based
-tint** approach instead of the current hue-band detection method.
+The shader at `res://assets/shaders/hero_body_tint.gdshader` (integrated in
+`HeroModelBuilder._apply_hero_tint()`) is currently **hue-band based** (detects skin by
+hue range; no tint-mask sampler). Per contract §7 it must be **rewritten to mask-based**,
+sampling a dedicated `tint_mask_texture`. This is a shared-shader rewrite affecting all
+heroes — see "Cross-hero impact" note below.
 
-#### Shader inputs (uniforms)
+#### Shader inputs (uniforms — per contract §7)
 
-| Uniform | Type | Source | Default |
-|---|---|---|---|
-| `tint_color` | vec3 | Per-instance from `HeroConfig.hero_color` | white |
-| `tint_strength` | float | Constant or per-team modifier | 1.0 |
-| `albedo_texture` | sampler2D | `pudge_body_basecolor.png` | — |
-| `normal_texture` | sampler2D | `pudge_body_normal.png` | — |
-| `orm_texture` | sampler2D | `pudge_body_orm.png` | — |
-| `emissive_texture` | sampler2D | `pudge_body_emissive.png` (256 × 256) | — |
-| `emissive_color` | vec3 | Material constant per concept | `(1.0, 0.7, 0.0)` |
-| `emissive_energy` | float | Material constant | 3.0 |
+| Uniform | Type | Per-instance? | Source | Default |
+|---|---|---|---|---|
+| `albedo_texture` | sampler2D | **No** — per-material | `body_basecolor.png` | — |
+| `normal_texture` | sampler2D | No — per-material | `body_normal.png` | — |
+| `orm_texture` | sampler2D | No — per-material | `body_orm.png` | — |
+| `emission_texture` | sampler2D | No — per-material | `body_emissive.png` (256 × 256) | — |
+| `tint_mask_texture` | sampler2D | No — per-material | `body_tintmask.png` | — |
+| `team_tint_color` | vec3 (Color) | **Yes** — `instance uniform` | Per-instance via `HeroConfig.hero_color` | `Color(0.5, 0.8, 0.2)` (Pudge green) |
+| `emission_color` | vec3 (Color) | No — material constant | per concept | `Color(1.0, 0.7, 0.0)` (eye yellow) |
+| `emission_energy` | float | No — material constant | per concept | 3.0 |
+
+**Godot 4.6 per-instance constraint (contract O-6):** only `team_tint_color` (a vec3)
+is `instance uniform`; **all `sampler2D` uniforms stay per-material.** Godot 4.6 rejects
+`instance uniform sampler2D` at compile (`SCOPE_INSTANCE not supported for sampler
+types`). The 10 on-screen Pudge instances share one `ShaderMaterial` and reference the
+same `Texture2D` resources (loaded into VRAM once); only the tint color varies per
+instance. **Do not attempt to make the samplers per-instance later — it will not compile.**
+
+**Per-instance set call:** the runtime must set the tint via
+`set_instance_shader_parameter("team_tint_color", color)` — **not**
+`set_shader_parameter()`. `set_shader_parameter()` mutates the shared material and would
+either tint every instance the same color or force a unique material per instance
+(inflating VRAM ~10×). This corrects the current `_apply_hero_tint` at
+`hero_model_builder.gd:401-412`, which uses `set_shader_parameter` (filed as a Stage 10
+code task — see §11.H and the separate code task).
 
 #### Shader logic (per-fragment, pseudocode)
 
 ```glsl
-vec4 albedo_sample = texture(albedo_texture, UV);
-vec3 base_rgb = albedo_sample.rgb;
-float tint_mask = albedo_sample.a;
+// tint mask is its own single-channel map, NOT the basecolor alpha
+vec3  base_rgb   = texture(albedo_texture, UV).rgb;
+float tint_mask  = texture(tint_mask_texture, UV).r;
 
-// Mix between base color and tinted color by mask
-vec3 final_albedo = mix(base_rgb, base_rgb * tint_color, tint_mask * tint_strength);
+// mix toward team color by the mask; team_tint_color == vec3(1.0) → no tint
+vec3 final_albedo = base_rgb * mix(vec3(1.0), team_tint_color, tint_mask);
 
 vec3 normal_ts = decode_normal_rg(texture(normal_texture, UV).rg);
 
@@ -543,39 +573,57 @@ float ao = orm.r;
 float roughness = orm.g;
 float metallic = orm.b;
 
-vec3 emissive_sample = texture(emissive_texture, eye_subuv).rgb;
-vec3 final_emissive = emissive_sample * emissive_color * emissive_energy;
+vec3 emission_sample = texture(emission_texture, UV).rgb;
+vec3 final_emission  = emission_sample * emission_color * emission_energy;
 
 ALBEDO = final_albedo;
 NORMAL_MAP = normal_ts;
 AO = ao;
 ROUGHNESS = roughness;
 METALLIC = metallic;
-EMISSION = final_emissive;
+EMISSION = final_emission;
 ```
+
+#### Cross-hero impact
+
+Rewriting the shared `hero_body_tint.gdshader` to mask-based means **every existing hero
+(Vex, Lash, Maw) also needs a `body_tintmask.png`** painted to its geometry, or it will
+render untinted. This is a project-wide texture-artist task tracked in contract O-8, not
+a Pudge-only deliverable. Shader-rewrite owner: `godot-shader-specialist`; cross-hero
+tintmask owner: `texture-artist`.
 
 ### Shader Target — Hook
 
 Standard Godot `StandardMaterial3D` with:
-- Albedo texture: `pudge_hook_basecolor.png`
-- Normal texture: `pudge_hook_normal.png` (set normal map flag)
+- Albedo texture: `hook_basecolor.png`
+- Normal texture: `hook_normal.png` (set normal map flag)
 - ORM texture: routed to AO, Roughness, Metallic via Godot's built-in ORM import
 - No emissive, no tint, no custom shader needed
 
 ### Texture Compression (Godot Import Settings)
 
-| Map | Mobile compression | Memory per map (1024²) | Memory per map (512²) |
+**Compression format is gated on contract O-1 (device tier).** The table below uses the
+**ETC2 RGBA baseline** (broad Android) because it is the conservative, larger figure —
+per contract O-7, the earlier ASTC-6×6 numbers in this spec were ~2.25× too optimistic
+and ASTC 6×6 must be set manually per-texture. If O-1 locks iOS-only / A8+ Android,
+switch to ASTC 6×6 for ~55% savings. VRAM figures below match contract §7's table.
+
+| Map | Resolution | ETC2 baseline (compressed) | With mips (×1.33) |
 |---|---|---|---|
-| BaseColor (RGBA) | ASTC 6×6 RGBA | ~340 KB | ~85 KB |
-| Normal (RG) | ASTC 6×6 RG | ~170 KB | ~43 KB |
-| ORM (RGB) | ASTC 6×6 RGB | ~256 KB | ~64 KB |
-| Emissive (RGB, 256²) | ASTC 6×6 RGB | ~16 KB | — |
+| `body_basecolor.png` | 1024² | 0.50 MB | 0.67 MB |
+| `body_normal.png` | 1024² | 0.50 MB | 0.67 MB |
+| `body_orm.png` | 1024² | 0.50 MB | 0.67 MB |
+| `body_emissive.png` | 256² | 0.03 MB | 0.04 MB |
+| `body_tintmask.png` | 1024² (BC4 / ETC2 R) | 0.13 MB | 0.17 MB |
+| `hook_basecolor.png` | 512² | 0.13 MB | 0.17 MB |
+| `hook_normal.png` | 512² | 0.13 MB | 0.17 MB |
+| `hook_orm.png` | 512² | 0.13 MB | 0.17 MB |
+| **Total per hero (textures shared across instances)** | | **~2.05 MB** | **~2.73 MB** |
 
-**Total texture memory per Pudge instance** (shared across instances of same hero):
-~782 KB for body atlas + ~192 KB for hook atlas = **~975 KB ≈ 1 MB**.
-
-10 hero instances on screen all share the same body/hook textures (only `tint_color`
-uniform differs per instance) — total scene texture cost stays at **~1 MB**, not 10 MB.
+10 hero instances on screen all share the same body/hook textures (only the
+`team_tint_color` instance uniform differs) — total scene texture cost stays at
+**~2.7 MB**, not ~27 MB. See §11 F.4b for the enforced ≤ 8 MB budget gate and contingency
+trims if a 2 MB ceiling is imposed post-O-1.
 
 ### Material Property Tables (Concept-Locked Values)
 
@@ -762,17 +810,23 @@ This spec uses Mixamo bone names because:
 
 ### Five Sockets
 
+Values below are propagated verbatim from **contract §5** (rig-spec coordinates with
+`mixamorig:` parent names). The earlier model-spec offsets (`(0.05, 0, 0)` along +X,
+`socket_hit_center` at `(0, 0, -0.28)`) were authored against a non-standard roll
+convention and are **superseded**.
+
 | Socket name | Bone parent (sanitized) | Local Position (m) | Local Rotation (deg) | Purpose |
 |---|---|---|---|---|
-| `socket_hook_hand` | `mixamorig_LeftHand` | (0.05, 0.00, 0.00) | (0, 0, 0) | Hook prop attachment point. The `mesh_pudge_hook` is parented here. Detached at runtime during `hook_throw` animation. |
-| `socket_offhand` | `mixamorig_RightHand` | (0.04, 0.00, 0.00) | (0, 0, 0) | Optional cleaver / secondary attack prop spawn point. |
-| `socket_chain_origin` | `mixamorig_Spine2` | (-0.08, 0.05, 0.00) | (0, 0, 0) | Chain VFX anchor when the hook is offscreen during `hook_throw`. Offset to character's left where the chain visually exits the body. |
-| `socket_hit_center` | `mixamorig_Spine1` | (0.00, 0.00, -0.28) | (0, 0, 0) | Damage VFX origin + hit-react impulse reference point. Placed at forward-most belly equator (Pudge's largest screen-filling part at top-down cam). |
-| `socket_head_top` | `mixamorig_Head` | (0.00, 0.18, 0.00) | (0, 0, 0) | Status effect icon mount (stun halo, level-up burst, CC indicator). Floats above skull dome. |
+| `socket_hook_hand` | `mixamorig_LeftHand` | (0.00, 0.00, -0.05) | (-15, 0, 0) | Hook prop attachment point. The `mesh_pudge_hook` is parented here, weighted 100% to LeftHand. 5 cm along LeftHand's -Z (palm → fingertip grip); the -15° X tilt orients the hook tip forward-down at bind so it reads forward-outward at the raised-arm idle pose. Detached at runtime during `hook_throw`. |
+| `socket_offhand` | `mixamorig_RightHand` | (0.00, 0.00, -0.04) | (0, 0, 0) | Cleaver / secondary attack prop spawn point. 4 cm along RightHand's -Z. Cleaver orientation lives in the prop's own transform. |
+| `socket_chain_origin` | `mixamorig_Spine2` | (-0.08, 0.05, 0.00) | (0, 0, 0) | Chain VFX anchor when the hook is offscreen during `hook_throw`. 8 cm to character's left of Spine2, 5 cm above — the concept's visible chain exit on the upper-left chest. |
+| `socket_hit_center` | `mixamorig_Spine1` | (0.00, 0.00, +0.12) | (0, 0, 0) | Damage VFX origin + hit-react impulse reference. 12 cm forward of Spine1 (toward face direction) — the belly equator's most-protruding screen-filling point at top-down camera. (The belly equator sits *below* Spine1, not 0.28 m in front of it, hence the smaller +0.12.) |
+| `socket_head_top` | `mixamorig_Head` | (0.00, 0.18, 0.00) | (0, 0, 0) | Status effect icon mount (stun halo, level-up burst, CC indicator). 18 cm above Head bone origin — reaches the top of the 0.42 m skull dome. |
 
-**Local position interpretation**: positions are in **bone local space**, where the
-bone's +Y axis points along the bone (head → tail). +X and +Z are perpendicular axes
-following Mixamo's bone roll convention.
+**Local position interpretation**: positions are in **bone local space** following
+Mixamo's bone-roll convention — +Y along the bone (head → tail), +Z the bone's roll
+"forward" (faces -Z world when the bone is vertical at T-pose), +X = Y × Z. This is the
+same convention the rig spec uses; see contract §5.
 
 ### Per-Socket World Position at T-Pose Rest (for verification)
 
@@ -781,14 +835,16 @@ mesh is in T-pose bind. Expected values:
 
 | Socket | World position at T-pose rest (m) | Verification region in mesh |
 |---|---|---|
-| `socket_hook_hand` | (+0.55, +0.95, +0.05) | At the left palm center, slightly forward (toward -Z when facing -Z) |
-| `socket_offhand` | (-0.55, +0.95, +0.04) | At the right palm center, slightly forward |
-| `socket_chain_origin` | (-0.08, +0.95, +0.00) | Upper chest, left-of-center (concept's chain exit point) |
-| `socket_hit_center` | (+0.00, +0.58, -0.28) | Forward belly equator (most protruding point) |
+| `socket_hook_hand` | (+0.55, +0.95, ±0.05) | At the left palm center, slightly toward fingertip |
+| `socket_offhand` | (-0.55, +0.95, ±0.04) | At the right palm center |
+| `socket_chain_origin` | (-0.08, +0.78, +0.00) | Upper chest, left-of-center (concept's chain exit point) |
+| `socket_hit_center` | (+0.00, +0.55, -0.12) | Forward belly equator (most protruding point) |
 | `socket_head_top` | (+0.00, +1.40, +0.00) | Top of skull dome |
 
 The rigger places the bones such that these world positions match the visual
-landmarks. Once bones are placed, sockets' local offsets stay small and stable.
+landmarks. Once bones are placed, sockets' local offsets stay small and stable. Per
+contract §5: if a socket resolves >5 cm off its visual landmark, the **bone** is
+misplaced, not the socket.
 
 ### Hook Prop Behavior — Detail
 
@@ -848,8 +904,10 @@ Sockets attach to bones, not to specific mesh LODs. As LOD swaps from LOD0 → L
 LOD2, the skeleton stays the same — sockets remain attached to bones, no per-LOD
 socket adjustment needed.
 
-At LOD3 (impostor billboard), sockets are not used — visual effects spawn at the
-billboard's world position with no bone targeting.
+LOD3 (impostor billboard) is **deferred to post-MVP** (contract O-13); for MVP, LOD2
+extends to infinity and the skeleton — hence all 5 sockets — remains valid at every
+distance. If a LOD3 impostor is added later, sockets would not be used at that level
+(effects spawn at the billboard's world position with no bone targeting).
 
 ### Future Sockets (Out of Scope This Spec)
 
@@ -940,8 +998,10 @@ Here we lock the **bone count** and **deformation-critical topology** so retopo
 
 ### Skeleton — Mixamo-Compatible
 
-**Total bones: 20-25** depending on optional features (BellyJiggle required, Jaw +
-chain bones optional). All bones use Mixamo naming convention.
+**MVP bone count: 22** (20 Mixamo humanoid + BellyJiggle + Jaw), locked by **contract
+§3**. BellyJiggle and Jaw are both **included** in MVP; the 4 ChainLink bones are
+**deferred to post-MVP** (full count = 26 with chain). All bones use Mixamo naming
+convention.
 
 **In Blender authoring**: bones named `mixamorig:BoneName` (with colon).
 **After Godot glTF import**: sanitized to `mixamorig_BoneName` (underscore).
@@ -957,12 +1017,12 @@ pudge (scene root empty — not a bone)
         │       ├── mixamorig:Spine2        [chest]
         │       │   ├── mixamorig:Neck      [compressed neck stub — see §3]
         │       │   │   └── mixamorig:Head  [skull]
-        │       │   │       └── mixamorig:Jaw (OPTIONAL)
+        │       │   │       └── mixamorig:Jaw   [INCLUDED in MVP per contract §4.2 / Q4]
         │       │   ├── mixamorig:LeftShoulder
         │       │   │   └── mixamorig:LeftArm
         │       │   │       └── mixamorig:LeftForeArm
         │       │   │           └── mixamorig:LeftHand
-        │       │   │               └── (chain bones if used — see below)
+        │       │   │               └── (ChainLink1-4 — POST-MVP only, see below)
         │       │   └── mixamorig:RightShoulder
         │       │       └── mixamorig:RightArm
         │       │           └── mixamorig:RightForeArm
@@ -1003,25 +1063,26 @@ pudge (scene root empty — not a bone)
 
 #### Custom Pudge bones
 
-| Bone | Required? | Parent | Role |
+| Bone | MVP? | Parent | Role |
 |---|---|---|---|
-| `mixamorig:BellyJiggle` | **YES** | `mixamorig:Spine1` | Drives gut bounce in idle, walk, run, death. Spring-driven via Godot 4.6 `SkeletonModification3D` if available, else keyframed. Influence painted via `jiggle_boundary` vertex color (§3). |
-| `mixamorig:Jaw` | Optional | `mixamorig:Head` | Drives mouth open for `taunt` and `death` (gape). Cut if `taunt` is descoped from MVP. |
-| `mixamorig:ChainLink1` | Optional | `mixamorig:LeftHand` | First belt-chain link. |
-| `mixamorig:ChainLink2` | Optional | `mixamorig:ChainLink1` | Second link. |
-| `mixamorig:ChainLink3` | Optional | `mixamorig:ChainLink2` | Third link. |
-| `mixamorig:ChainLink4` | Optional | `mixamorig:ChainLink3` | Fourth link (closest to belt). Spring-driven for organic sway if Godot's `SkeletonModification3D` supports it. |
+| `mixamorig:BellyJiggle` | **YES** | `mixamorig:Spine1` | Drives gut bounce in idle, walk, run, death. **Keyframed in all 10 clips by the animator** — Godot 4.6 ships no spring/jiggle SkeletonModifier3D (contract O-4), so the runtime-spring path is post-MVP. Influence painted via `jiggle_boundary` vertex color (§3, 2-color encoding). |
+| `mixamorig:Jaw` | **YES** | `mixamorig:Head` | Mouth open for `death` (gape) and `victory` (laugh cadence). **Included in MVP per contract §4.2 / Q4** — non-optional; avoids a corrective `mouth_open_taunt` blendshape. |
+| `mixamorig:ChainLink1` | **POST-MVP** | `mixamorig:LeftHand` | First belt-chain link — deferred (contract §3). |
+| `mixamorig:ChainLink2` | **POST-MVP** | `mixamorig:ChainLink1` | Second link — deferred. |
+| `mixamorig:ChainLink3` | **POST-MVP** | `mixamorig:ChainLink2` | Third link — deferred. |
+| `mixamorig:ChainLink4` | **POST-MVP** | `mixamorig:ChainLink3` | Fourth link (closest to belt) — deferred. For MVP the hand→belt chain drape is **static painted geometry** on the body atlas (no sway). |
 
 #### Total bone count summary
 
 | Configuration | Bones | When to use |
 |---|---|---|
-| **Minimum** (no Jaw, no chain) | **21** (20 Mixamo + BellyJiggle) | If Jaw and chain sway are descoped. Most lean. |
-| **MVP** (Jaw, no chain) | **22** | MVP shipping target. Jaw enables taunt and death gape. |
-| **Full** (Jaw + chain bones) | **25** | Best visual fidelity. Chain sway enriches idle. |
+| **Minimum** (no Jaw, no chain) | **21** (20 Mixamo + BellyJiggle) | Only if scope tightens further. Cuts Jaw. |
+| **MVP** (Jaw included, no chain) | **22** | **Locked shipping target** (contract §3). Jaw enables death + victory gape; chain drape is static painted geometry. |
+| **Full** (Jaw + 4 ChainLink) | **26** | Post-MVP polish. Chain sway enriches idle if profiling shows headroom. |
 
-**Recommended for MVP**: 22 bones (minimum + BellyJiggle + Jaw). Chain bones added
-post-MVP if profiling allows.
+**Locked for MVP**: **22 bones** (20 Mixamo + BellyJiggle + Jaw) per contract §3. The 4
+ChainLink bones are post-MVP. (Earlier "25 full" was a miscount — full with all 4 chain
+links is 26.)
 
 ### Blendshapes / Shape Keys
 
@@ -1102,7 +1163,7 @@ Critical bone-to-mesh mapping (rigger uses as starting point):
 | Head + face | `Head` | `Neck` (5%) | `head_only` |
 | Neck stub | `Neck` | `Spine2` (50%) — bidirectional blend | (boundary loop) |
 | Belly equator | `BellyJiggle` (80%) | `Spine1` (20%) | `jiggle_boundary` red region |
-| Belly transitions | `BellyJiggle` (40%) | `Spine1` (60%) | `jiggle_boundary` yellow region |
+| Belly transitions | `BellyJiggle` (~40%, follows gradient) | `Spine1` (~60%) | `jiggle_boundary` pink-gradient region |
 | Belly upper / lower seam | `Spine1` (100%) | — | `jiggle_boundary` white region |
 | Hook arm shoulder | `LeftShoulder` | `LeftArm` (35%), `Spine2` (15%) | (deltoid region) |
 | Hook arm bicep | `LeftArm` | `LeftShoulder` (20%), `LeftForeArm` (10%) | |
@@ -1190,9 +1251,14 @@ script) match on these exact names. Spelling matters.
 | LOD1 collection (optional) | `pudge_lod1` | |
 | LOD2 collection (optional) | `pudge_lod2` | |
 
-**LOD suffix is mandatory.** Godot's glTF importer auto-detects `_lod0`, `_lod1`,
-`_lod2` suffixes and configures LOD switching automatically. Missing suffix = no LOD
-detected = manual import setup required.
+**LOD suffix is mandatory** for naming clarity and tooling — but **it does NOT trigger
+automatic LOD switching.** Per contract O-5, Godot 4.6's `_lod*` suffix auto-detect is a
+*proposal*, not implemented: Godot auto-generates LODs from a single source mesh via
+meshoptimizer but does **not** group pre-authored separate meshes by suffix. The correct
+Stage 10 workflow is to import each LOD as its own `MeshInstance3D`, configure
+`visibility_range_begin` / `visibility_range_end` per instance at the §2 distances, and
+**disable Godot's automatic LOD generation** in import settings ("Generate LODs" → false).
+See §11 F.2 for the verification gate.
 
 #### Mesh Data-Blocks
 
@@ -1221,18 +1287,21 @@ like `Mesh.001` are blockers — fail the export check.
 
 #### Textures (output for texture-artist)
 
-Path: `src/assets/models/heroes/textures/`
+Path: `src/assets/textures/heroes/pudge/` (per contract §7 / §13 — the directory provides
+the hero namespace, so **filenames carry no `pudge_` prefix**). The old
+`src/assets/models/heroes/textures/` path with prefixed names is superseded on both axes.
 
 | File | Resolution | Material slot |
 |---|---|---|
-| `pudge_body_basecolor.png` | 1024×1024 RGBA | `mat_pudge_body` albedo (RGB) + tint mask (A) |
-| `pudge_body_normal.png` | 1024×1024 RG | `mat_pudge_body` normal (RG, B reconstructed) |
-| `pudge_body_orm.png` | 1024×1024 RGB | `mat_pudge_body` AO+roughness+metallic |
-| `pudge_body_emissive.png` | 256×256 RGB | `mat_pudge_body` emissive (eyes only, cropped) |
-| `pudge_hook_basecolor.png` | 512×512 RGB | `mat_pudge_hook` albedo |
-| `pudge_hook_normal.png` | 512×512 RG | `mat_pudge_hook` normal |
-| `pudge_hook_orm.png` | 512×512 RGB | `mat_pudge_hook` AO+roughness+metallic |
-| `pudge_body_basecolor_ai_projection.png` | 1024×1024 RGB | **Reference only** — AI mesh's projected colors. NOT FINAL. Labeled clearly in handoff. |
+| `body_basecolor.png` | 1024×1024 RGB | `mat_pudge_body` albedo (pure RGB — no alpha) |
+| `body_normal.png` | 1024×1024 RG | `mat_pudge_body` normal (RG, B reconstructed) |
+| `body_orm.png` | 1024×1024 RGB | `mat_pudge_body` AO+roughness+metallic |
+| `body_emissive.png` | 256×256 RGB | `mat_pudge_body` emissive (eyes only, cropped) |
+| `body_tintmask.png` | 1024×1024 R | `mat_pudge_body` team-tint mask (single channel) — **dedicated 5th map per contract §7** |
+| `hook_basecolor.png` | 512×512 RGB | `mat_pudge_hook` albedo |
+| `hook_normal.png` | 512×512 RG | `mat_pudge_hook` normal |
+| `hook_orm.png` | 512×512 RGB | `mat_pudge_hook` AO+roughness+metallic |
+| `body_basecolor_ai_projection.png` | 1024×1024 RGB | **Reference only** — AI mesh's projected colors. NOT FINAL. Labeled clearly in handoff. |
 
 #### Output GLB Files (Stage 10)
 
@@ -1314,7 +1383,7 @@ This is the **acceptance checklist** for the character-artist's handoff.
 
 - [ ] `src/assets/models/heroes/pudge.glb` — body + skeleton + animations
   - [ ] Contains 3 body LODs (`mesh_pudge_body_lod0`, `_lod1`, `_lod2`)
-  - [ ] Contains armature (`arm_pudge`) with all 22 MVP bones (or 21/25 if Jaw/chain config differs)
+  - [ ] Contains armature (`arm_pudge`) with all 22 MVP bones (21 if Jaw cut; 26 if all 4 ChainLink added post-MVP)
   - [ ] Contains AnimationLibrary with 10 clips (see §C.4 below)
   - [ ] Forward axis = -Z in Godot (Pudge faces movement direction natively, no runtime rotation needed)
   - [ ] Feet at Y = 0
@@ -1328,32 +1397,33 @@ This is the **acceptance checklist** for the character-artist's handoff.
 
 ### C. Texture Files
 
-Path: `src/assets/models/heroes/textures/`
+Path: `src/assets/textures/heroes/pudge/` (no `pudge_` filename prefix — per contract §7)
 
 #### C.1 Final body atlas (1024 × 1024)
 
-- [ ] `pudge_body_basecolor.png` (RGBA — RGB = hand-painted base, A = tint mask)
-- [ ] `pudge_body_normal.png` (RG — tangent-space normal, baked from `textured_mesh_bake_hp`)
-- [ ] `pudge_body_orm.png` (RGB — R=AO baked in combined-scene, G=Roughness, B=Metallic)
+- [ ] `body_basecolor.png` (RGB — pure hand-painted base, no alpha)
+- [ ] `body_normal.png` (RG — tangent-space normal, baked from `textured_mesh_bake_hp`)
+- [ ] `body_orm.png` (RGB — R=AO baked in combined-scene, G=Roughness, B=Metallic)
+- [ ] `body_tintmask.png` (single-channel R — dedicated team-tint mask per contract §7; 1.0 on skin, 0.0 elsewhere)
 
 #### C.2 Final eye emissive (256 × 256, cropped)
 
-- [ ] `pudge_body_emissive.png` (RGB — black except eye sclera region per concept material table)
+- [ ] `body_emissive.png` (RGB — black except eye sclera region per concept material table)
 
 #### C.3 Final hook atlas (512 × 512)
 
-- [ ] `pudge_hook_basecolor.png` (RGB)
-- [ ] `pudge_hook_normal.png` (RG)
-- [ ] `pudge_hook_orm.png` (RGB — combined-scene AO bake)
+- [ ] `hook_basecolor.png` (RGB)
+- [ ] `hook_normal.png` (RG)
+- [ ] `hook_orm.png` (RGB — combined-scene AO bake)
 
 #### C.4 Reference (NOT FINAL)
 
-- [ ] `pudge_body_basecolor_ai_projection.png` (RGB) — AI-mesh projected color, labeled in handoff notes as "REFERENCE ONLY — DO NOT SHIP"
+- [ ] `body_basecolor_ai_projection.png` (RGB) — AI-mesh projected color, labeled in handoff notes as "REFERENCE ONLY — DO NOT SHIP"
 
 #### C.5 Texture validation
 
 - [ ] Each PNG passes UV-checker visualization (no stretched / missing islands)
-- [ ] Body atlas passes 3-tint validation (green/red/blue uniform produces coherent Pudge — §5)
+- [ ] Body atlas passes 3-tint validation (green/red/blue produces coherent Pudge — §5), driven through `body_tintmask.png` + the rewritten mask-based shader
 - [ ] Normal maps verified in Godot at LOD0 distance — no obvious cage leaks at belly, shoulder, eye socket
 - [ ] Emissive map painted only on eye sclera (not pupil, not surrounding skin)
 
@@ -1410,7 +1480,7 @@ The asset cannot be marked complete until each of these gates passes:
 
 #### F.2 Godot import sanity
 
-- [ ] `pudge.glb` imports with no ERROR rows in Godot Output panel. Warnings reviewed against the approved-warnings list at `production/qa/godot-acceptable-warnings.md` (created at Stage 10 first import; any new warning type added to the list requires technical-artist sign-off)
+- [ ] `pudge.glb` imports with no ERROR rows in Godot Output panel. Warnings reviewed against the approved-warnings list at `production/qa/godot-acceptable-warnings.md` — **this file already exists as a versioned stub** (bootstrapped 2026-06-18, initially empty); the reviewer adds each observed warning type to it with a justification, and any warning type *not* on the list blocks the gate until technical-artist signs off on adding it. (No circular dependency: the list pre-exists; F.2 populates it, it is not created by F.2.)
 - [ ] `pudge_hook.glb` imports with same warning-review standard as above
 - [ ] Skeleton bones present and named `mixamorig_*` (sanitized from `mixamorig:` per contract §3)
 - [ ] **Per contract O-5**: LOD auto-detection by `_lod*` suffix does NOT work in Godot 4.6 for pre-authored LODs. Verify each LOD `MeshInstance3D` has correct `visibility_range_begin` and `visibility_range_end` configured manually per the Stage 10 import setup. Orbit the editor camera and confirm LOD swap happens at the spec §2 distances
@@ -1422,14 +1492,26 @@ The asset cannot be marked complete until each of these gates passes:
 - [ ] All 5 sockets resolve to `BoneAttachment3D` (not Marker3D fallback) — check via `print(socket.get_class())` in a smoke test, must print `BoneAttachment3D` for all 5 socket names from contract §5
 - [ ] Hook prop attached to `socket_hook_hand` at runtime (hook mesh parented to the socket node in the scene tree)
 - [ ] Team tint shader applies correctly: render the same Pudge instance 3 times with `hero_color` = `Color(0.5, 0.8, 0.2)` (green), `Color(0.9, 0.2, 0.2)` (red), `Color(0.2, 0.4, 0.9)` (blue). All three produce visually coherent Pudge with the skin tinted to the team color and non-skin surfaces (eyes, belt, boots, hook) unchanged. Screenshots saved to `production/qa/evidence/pudge-tint-{green,red,blue}.png`
-- [ ] **Silhouette readability (objective measurement)**: In the Godot editor scene view at game-cam distance (5-8 m, top-down 30° pitch), the hook prop tip extends outside the body silhouette bounding box by at least 20% of character height (≥0.28 m for the 1.40 m Pudge). Measure via the editor's selection gizmo (select hook mesh, read bounding box extents) vs body mesh bounds. Screenshot saved to `production/qa/evidence/pudge-silhouette-game-cam.png`
-- [ ] **Face readability at menu cam (objective measurement)**: At menu cam distance (1.5-2 m, eye-level), screenshot to `production/qa/evidence/pudge-face-menu-cam.png` must show: (a) asymmetric eyes — the larger left eye is visibly bigger than the right when measured in pixels (~15% larger sclera diameter per concept); (b) each pupil readable as a distinct dark spot (≥3 px wide at 1080p capture); (c) stitch lines resolve as ≥2 px wide painted dark seams across the belly front
+- [ ] **Silhouette readability (objective measurement)**: In the Godot editor scene view at game-cam distance (5-8 m, top-down 30° pitch), the hook prop tip extends outside the body silhouette bounding box by at least 20% of character height (≥0.28 m for the 1.40 m Pudge). This is a **world-space** measurement (DPI-independent): read the hook mesh's AABB extents vs the body mesh AABB via the editor selection gizmo. Screenshot saved to `production/qa/evidence/pudge-silhouette-game-cam.png`.
+- [ ] **Face readability at menu cam (objective measurement)**: Capture **at a pinned 1920×1080 viewport with HiDPI/display-scaling disabled** (set window override to 1920×1080, `display/window/dpi/allow_hidpi=false` for the capture) so pixel counts are reproducible across displays. At menu cam distance (1.5-2 m, eye-level), screenshot `production/qa/evidence/pudge-face-menu-cam.png` must show: (a) asymmetric eyes — the larger left eye sclera diameter is ≥15% greater than the right (measure in captured pixels); (b) each pupil readable as a distinct dark spot (≥3 px wide); (c) stitch lines resolve as ≥2 px wide painted dark seams across the belly front. Pixel thresholds are valid **only** at the pinned 1920×1080 capture; re-derive proportionally if the capture resolution changes.
 
 #### F.4 Performance baseline
 
-- [ ] **Stress scene** at `src/scenes/perf/pudge_stress_test.tscn` — 10 instances of `pudge.glb` at LOD0, no terrain, no VFX, all in camera frustum, shadows OFF, vsync OFF. Test apparatus + workflow documented at `tests/performance/README.md`.
-- [ ] **Target-device p95** ≤ 16 ms (60 FPS budget). Device named in contract O-1 (deferred until tech-director + producer decide). FAIL = p95 > 16 ms → spec renegotiation: drop body atlas to 512, drop LOD0 ceiling to 4,500 tris, or both. Result recorded in `tests/performance/README.md` baseline history table per the Step 6 measurement framework.
-- [ ] **Texture memory budget**: total scene texture cost ≤ 8 MB (with mips, ETC2 RGBA compression). This budgets ~5.5-7.3 MB for one Pudge's shared atlases (5 body maps at 1024² + 3 hook maps at 512²) — updated per contract O-7 verification. The previous "≤ 2 MB" criterion was authored before ETC2 RGBA's actual ~1 MB/1024² per-map cost was verified; that target is impossible without dropping atlas sizes. If 2 MB is required (e.g. low-end Android), apply contingency trims from materials spec §12 (drop tintmask to 512², drop body normal to 512²) and re-measure.
+The performance gate is split because the asset under test differs by stage. **F.4a uses
+whatever build currently exists (prototype primitives) and is informational only; F.4b is
+the binding acceptance gate and requires the Stage 10 final spec-compliant `pudge.glb` on
+the named target device.** Do not pass F.4b against the prototype build.
+
+##### F.4a — Dev-machine smoke (informational, any build)
+
+- [ ] **Stress scene** at `src/scenes/perf/pudge_stress_test.tscn` — 10 instances at LOD0, no terrain, no VFX, all in camera frustum, shadows OFF, vsync OFF. Apparatus + workflow at `tests/performance/README.md`.
+- [ ] Run on the dev machine with the **current** build and record p95 in the `tests/performance/README.md` history table, **explicitly labeling which build was measured** (e.g. "prototype primitives" vs "Stage 10 GLB"). This is a regression tripwire, **not** an acceptance gate — a dev-machine pass does not satisfy F.4b.
+
+##### F.4b — Target-device acceptance (binding, Stage 10 final GLB only)
+
+- [ ] The stress scene must reference the **Stage 10 final, spec-compliant `pudge.glb`** (single skinned body mesh + hook, real atlases, 22-bone skeleton) — **not** the prototype primitives build. Confirm the asset under test is the shipped GLB before recording a verdict.
+- [ ] **Target-device p95** ≤ 16 ms (60 FPS budget). Device named in contract O-1 (deferred until tech-director + producer decide; gate cannot pass until O-1 names the device). FAIL = p95 > 16 ms → spec renegotiation: drop body atlas to 512, drop LOD0 ceiling to 4,500 tris, or both. Result recorded in the `tests/performance/README.md` baseline history table per the Step 6 measurement framework.
+- [ ] **Texture memory budget**: total scene texture cost ≤ 8 MB (with mips, ETC2 RGBA). One Pudge's shared atlases measure **~2.05 MB (~2.73 MB with mips)** per contract §7 — comfortably inside 8 MB. The previous "≤ 2 MB" criterion was authored before ETC2 RGBA's actual ~1 MB/1024² per-map cost was verified (contract O-7); 8 MB is the realistic ceiling. If a hard 2 MB cap is imposed (e.g. low-end Android), apply contingency trims from materials spec §12 (drop tintmask to 512², drop body normal to 512²) and re-measure.
 - [ ] **Draw call count** = 20 (2 per instance × 10 = 20 mesh draw calls for characters)
 
 ### G. Handoff Documentation
@@ -1451,6 +1533,7 @@ The asset cannot be marked complete until each of these gates passes:
 - [ ] `Cube` (default cube from initial scene) deleted from `PUDGE_OLD_REFERENCE` collection
 - [ ] `HeroModelBuilder.HERO_SOCKETS` constant updated with §7 positions (per contract §5)
 - [ ] `HeroModelBuilder.build_model` line `glb_root.rotation.y = PI` REMOVED (no longer needed when GLB faces -Z natively per contract §2)
+- [ ] `HeroModelBuilder._apply_hero_tint` (`hero_model_builder.gd:401-412`) switched from `set_shader_parameter` (per-material) to `set_instance_shader_parameter("team_tint_color", color)` (per-instance) — per §5 and contract O-6. Using the per-material call against the rewritten mask shader would either tint all instances identically or force a unique material per instance (≈10× VRAM). Tracked as a separate code task (see handoff notes).
 - [ ] All §12 open questions either marked RESOLVED with decision text in this spec, OR migrated to `design/gdd/contracts/pudge-interface-contract.md` §11 with owner + deadline + status (DEFERRED / PARTIAL / RESOLVED acceptable; OPEN / NEW require resolution before F-gate runs)
 
 ### Acceptance Criteria
@@ -1458,8 +1541,8 @@ The asset cannot be marked complete until each of these gates passes:
 Pudge is "shipped per this spec" only when:
 
 1. ✅ All A-H sections checked complete
-2. ✅ F.1, F.2, F.3 gate runs all PASS
-3. ✅ Spec status changed from "DRAFT — section-by-section authoring in progress" to "APPROVED — production ready"
+2. ✅ F.1, F.1b, F.2, F.3 gate runs all PASS; **F.4a** recorded (informational); **F.4b** PASS once contract O-1 names the target device (until then F.4b is blocked-on-O-1, not failed)
+3. ✅ Spec status changed to "APPROVED — production ready"
 4. ✅ Sign-off recorded in handoff notes by character-artist and accepted by technical-artist
 
 If any gate fails, the asset returns to character-artist with specific failure
@@ -1502,19 +1585,16 @@ or it's purely a painted detail.
 
 ### For texture-artist (Stage 7)
 
-#### Q12.4 — Tint shader: rewrite to mask-based or extend existing hue-based?
+#### Q12.4 — Tint shader: rewrite to mask-based or extend existing hue-based? — ✅ RESOLVED
 
-The existing `res://assets/shaders/hero_body_tint.gdshader` detects skin via
-hue band (yellow-green hue range). This spec §5 prescribes a mask-based approach
-(alpha channel of base color = tint mask). Two paths:
-
-- **Option A**: Rewrite shader to mask-based. Cleaner, more controllable. Requires
-  every existing hero's base color to be re-authored with alpha mask.
-- **Option B**: Keep hue-based for current heroes, paint Pudge's base color to fit
-  the existing detection. Limits skin base palette.
-
-**Decision needed before Stage 7 texture painting starts.** Owner: art-director +
-gameplay-programmer.
+**RESOLVED (contract §7): Option A — rewrite to mask-based**, with the tint mask
+delivered as a **dedicated `body_tintmask.png`** single-channel map (NOT BaseColor alpha,
+which earlier drafts assumed). The shared `hero_body_tint.gdshader` is rewritten to sample
+`tint_mask_texture`; `team_tint_color` is a per-instance `instance uniform` set via
+`set_instance_shader_parameter` (samplers stay per-material — contract O-6). Consequence
+tracked in contract O-8: every existing hero (Vex/Lash/Maw) needs a `body_tintmask.png`,
+or scope the rewrite to Pudge only. Shader-rewrite owner: `godot-shader-specialist`;
+cross-hero tintmask owner: `texture-artist`.
 
 #### Q12.5 — Eye emissive: separate 256² texture or pack into ORM alpha?
 
@@ -1540,33 +1620,28 @@ final unwrap — we may need to either bump face density or add stitch decal geo
 
 ### For rigging-animator (Stage 8)
 
-#### Q12.8 — BellyJiggle bone: spring or keyframe?
+#### Q12.8 — BellyJiggle bone: spring or keyframe? — ✅ RESOLVED
 
-§9 says "spring-driven via `SkeletonModification3D` if available, else keyframed."
-Godot 4.6 restored skeleton modifications — confirm the spring modifier works for
-secondary motion on a single bone driven by the parent's velocity. If it works,
-spring is preferred (zero animator keyframe work). If not, all 10 animation clips
-need belly bounce keyframed manually.
+**RESOLVED (contract O-4): keyframe in all 10 clips for MVP.** Godot 4.6 ships **no**
+spring/jiggle SkeletonModifier3D — the available modifiers are CCDIK, FABRIK, Jacobian
+IK, Spline IK, TwoBoneIK plus 4.5's BoneConstraint3D set, none physics-driven. The
+animator hand-keyframes the belly bounce per clip (~20% extra animation time). A custom
+GDScript `SkeletonModifier3D` spring (~50 lines) is post-MVP polish if profiling shows
+keyframe drift across clip blends. Owner: `rigging-animator`.
 
-**Test in Stage 8 before authoring animation clips.**
+#### Q12.9 — Chain bone count: include in MVP or post-MVP? — ✅ RESOLVED
 
-#### Q12.9 — Chain bone count: include in MVP or post-MVP?
+**RESOLVED (contract §3): exclude — post-MVP.** MVP skeleton stays at **22 bones**; the
+hand→belt chain drape is **static painted geometry** on the body atlas (no sway). The 4
+`ChainLink1-4` bones (full = 26) are added post-launch if profiling shows headroom. Owner:
+`rigging-animator`.
 
-§9 lists `ChainLink1-4` as optional. If included, idle/walk gain organic chain sway
-but skeleton grows to 25 bones. If excluded, chain is a static painted strip on the
-body atlas (no sway).
+#### Q12.10 — Jaw bone: required for MVP or cut with taunt? — ✅ RESOLVED
 
-- **MVP recommendation**: exclude (keep at 22 bones)
-- **Polish phase**: add the chain bones + spring sim
-
-**Decision before Stage 8 starts** so the rigger knows the skeleton scope.
-
-#### Q12.10 — Jaw bone: required for MVP or cut with taunt?
-
-§9 lists Jaw as optional. Jaw is needed for `taunt` clip (mouth open) and `death`
-clip (gape). If taunt is descoped from MVP, Jaw can be cut, saving 1 bone.
-
-**Open question**: is `taunt` in MVP or post-MVP? Owner: game-designer.
+**RESOLVED (contract §4.2 / Q4): Jaw is INCLUDED in MVP** (non-optional). It drives the
+`death` gape and `victory` laugh cadence and avoids a corrective `mouth_open_taunt`
+blendshape. Cost: 1 bone, zero animation overhead on the 8 clips that ignore it. Owner:
+`game-designer` (decision made).
 
 #### Q12.11 — Hook prop weight constraint verification
 
@@ -1589,27 +1664,25 @@ pinching.
 
 ### For blender-specialist (Stage 10)
 
-#### Q12.13 — Export orientation: built right the first time?
+#### Q12.13 — Export orientation: built right the first time? — ✅ RESOLVED (Stage 4 entry, 2026-06-18)
 
-§6 mandates Pudge faces -Y in Blender so exports face -Z in Godot. The current
-`pudge_v2_remesh` (Stage 2 scaffolding) was imported from Hunyuan3D — direction
-not verified.
+**✅ RESOLVED — PASS (contract O-2 / §9).** Verified at Stage 4 entry via Blender MCP:
+`pudge_v2_remesh` in Front Orthographic shows the **face** (back view shows no face), so
+the mesh already faces **-Y in Blender** → exports to **-Z in Godot** natively, no 180°
+fix needed. Transforms confirmed clean at the same check (loc 0, rot 0, scale 1; feet ≈
+Z0, height ≈ 1.4 m). Catching this before sculpt detail bakes in eliminates the
+cascading 180°-flip-on-loader bug; the `glb_root.rotation.y = PI` hack is removed at
+Stage 10 per contract §2.
 
-**Stage 4 (sculpt cleanup) must verify the mesh faces -Y in Blender front view**
-before sculpting begins. If it faces +Y, rotate 180° around Z axis and apply
-rotation. Catching this early avoids the cascading 180°-flip-on-loader bug.
+#### Q12.14 — LOD object naming for Godot's auto-detect — ✅ RESOLVED
 
-#### Q12.14 — LOD object naming for Godot's auto-detect
-
-§10 specifies `mesh_pudge_body_lod0` / `_lod1` / `_lod2` for Godot's automatic LOD
-detection. Verify this auto-detect actually works in Godot 4.6 (versus needing
-manual import settings). If auto-detect fails:
-
-- **Workaround A**: Use Godot import dock to manually configure LODs
-- **Workaround B**: Switch to `MeshInstance3D.set_visibility_range` programmatically
-  at runtime in `HeroModelBuilder`
-
-Test during first export to Godot.
+**RESOLVED (contract O-5): auto-detect by `_lod*` suffix does NOT work in Godot 4.6 for
+pre-authored LODs.** It is a proposal, not implemented — Godot auto-generates LODs from a
+single source mesh via meshoptimizer but does not group separate suffixed meshes. The
+`_lod*` suffix is kept for naming clarity only. Correct workflow (Stage 10): import each
+LOD as its own `MeshInstance3D`, set `visibility_range_begin` / `visibility_range_end` per
+instance at the §2 distances, and **disable** "Generate LODs" in import settings. Owner:
+`blender-specialist` (export) + `technical-artist` (import setup).
 
 #### Q12.15 — Working .blend file location
 
@@ -1639,15 +1712,15 @@ This is the highest-risk code change. Easy to forget. Flag it in handoff notes.
 
 ### For game-designer / producer (strategic)
 
-#### Q12.18 — Update `design/gdd/hero-system.md` to include Pudge as 4th hero
+#### Q12.18 — Update `design/gdd/hero-system.md` to include Pudge as 4th hero — 🔶 PARTIAL
 
-User confirmed Pudge is a "separate 4th hero" (not Vex's visual identity).
-`hero-system.md` currently lists 3 heroes: Vex, Lash, Maw. Pudge needs to be added
-to the roster with his own data file (`data/heroes/pudge.tres` already exists from
-prior work) and statline.
-
-**Owner**: game-designer. **Deadline**: Stage 10 — when Pudge ships, the hero
-system must know about him.
+**PARTIAL (contract O-9, Step 9 2026-05-31).** Pudge is added to `hero-system.md` as the
+4th hero (Tank/disruptor, `hook_type=PULL`, fantasy + skill profile written). **Stat
+values still TBD** — `src/data/heroes/pudge.tres` carries debug placeholders
+(`hook_damage=99999`, `xp_on_hook_hit=0`); a real balance pass remains a `game-designer`
+task before Stage 10. Side-finding: `coil.tres` (CHARGE) and `flux.tres` (BEAM) exist but
+are undocumented — logged as a new open question in `hero-system.md`. **Owner**:
+game-designer. **Deadline**: Stage 10.
 
 #### Q12.19 — Concept doc title update
 
@@ -1656,20 +1729,15 @@ historical context where the hero_id and visual identity were intertwined).
 Now that Pudge is a separate hero, the concept doc should be reviewed for stale
 references. Owner: narrative-director / concept-artist.
 
-#### Q12.20 — Performance target device
+#### Q12.20 — Performance target device — ⏸ DEFERRED (contract O-1)
 
-§11 specifies "Mid-tier mobile target device." What is the actual target?
-
-- Samsung Galaxy A54 (mid-range 2023)?
-- iPhone 12 (mid-range 2020-2023)?
-- Both?
-
-The 6,000-tri LOD0 + 1024 atlas assumes mid-range mobile. If the actual target is
-high-end mobile only (iPhone 14 Pro+, S23+), budgets can grow. If low-end is
-included (sub-$300 Android), budgets must shrink.
-
-**Owner**: technical-director + producer. **Deadline**: before Stage 7 texture
-authoring (different compression for different tiers).
+**DEFERRED (contract O-1, owners: `technical-director` + `producer`, deadline: before
+Stage 7).** Target tier is not yet named. Provisional assumptions until it lands: Samsung
+Galaxy A54 / iPhone 12 tier, 16 ms (60 FPS) budget, ETC2 RGBA compression, 6,000-tri LOD0
+ceiling. This gates the F.4b performance gate (cannot pass until the device is named), the
+mobile compression format (ETC2 vs ASTC 6×6, contract O-7), and LOD-switch tuning. If
+decision slips past Stage 7, textures author in ETC2 by default and re-import later if
+ASTC is chosen.
 
 ### For QA (Stage 8+)
 
@@ -1707,22 +1775,25 @@ and storage. If no, current single-skin design is sufficient.
 
 Open questions roll up here for at-a-glance status:
 
+Statuses below reflect the 2026-06-18 contract-propagation pass. Items resolved at the
+contract level link to their contract ID; items still open carry an owner + deadline.
+
 | ID | Question | Owner | Deadline | Status |
 |---|---|---|---|---|
 | Q12.1 | Delete OLD scaffolding now | character-artist | Start of Stage 5 | Recommendation: defer to Stage 5 |
 | Q12.2 | Apron stub yes/no | art-director | Stage 4 | Recommendation: yes |
-| Q12.4 | Tint shader rewrite | art-director + gameplay-prog | Stage 7 | Recommendation: rewrite to mask-based |
+| Q12.4 | Tint shader rewrite | godot-shader-specialist + texture-artist | Stage 7 | ✅ RESOLVED — mask-based, dedicated `body_tintmask.png` (contract §7 / O-8) |
 | Q12.5 | Eye emissive separate vs packed | texture-artist | Stage 7 | Recommendation: separate |
-| Q12.8 | BellyJiggle spring vs keyframe | rigging-animator | Stage 8 | Test spring first |
-| Q12.9 | Chain bones in MVP | rigging-animator | Stage 8 | Recommendation: exclude (post-MVP) |
-| Q12.10 | Jaw bone in MVP | game-designer | Stage 8 | Tied to taunt scope decision |
-| Q12.13 | Mesh orientation verified | blender-specialist | Stage 4 | Action: verify before sculpt |
-| Q12.14 | LOD auto-detect works | blender-specialist | Stage 10 | Action: test during first export |
-| Q12.18 | Update hero-system.md | game-designer | Stage 10 | Action item carried forward |
-| Q12.20 | Mid-tier device target | technical-director | Stage 7 | Decision needed |
+| Q12.8 | BellyJiggle spring vs keyframe | rigging-animator | Stage 8 | ✅ RESOLVED — keyframe in all clips (contract O-4) |
+| Q12.9 | Chain bones in MVP | rigging-animator | Stage 8 | ✅ RESOLVED — exclude, post-MVP (contract §3) |
+| Q12.10 | Jaw bone in MVP | game-designer | Stage 8 | ✅ RESOLVED — included in MVP (contract §4.2 / Q4) |
+| Q12.13 | Mesh orientation verified | blender-specialist | Stage 4 entry | ✅ RESOLVED 2026-06-18 — PASS, faces -Y, no fix (contract O-2) |
+| Q12.14 | LOD auto-detect works | blender-specialist | Stage 10 | ✅ RESOLVED — does NOT work; manual `visibility_range` (contract O-5) |
+| Q12.18 | Update hero-system.md | game-designer | Stage 10 | 🔶 PARTIAL — roster updated, stat balance TBD (contract O-9) |
+| Q12.20 | Mid-tier device target | technical-director + producer | Stage 7 | ⏸ DEFERRED (contract O-1) |
 
 ---
 
 *End of Pudge Model Spec — Stage 3.*
-*Sections 1-12 authored 2026-05-30. Status: DRAFT awaiting full review.*
-*Next: review all sections together, then mark APPROVED and begin Stage 4 (sculpt cleanup).*
+*Sections 1-12 authored 2026-05-30; contract-propagation pass 2026-06-18 (body text aligned to `design/gdd/contracts/pudge-interface-contract.md`).*
+*Next: re-run `/design-review design/gdd/models/pudge.md` → target APPROVED, then begin Stage 4 (sculpt cleanup).*
